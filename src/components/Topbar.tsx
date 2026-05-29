@@ -1,9 +1,19 @@
-import { Bell, Command, Search, Sparkles, Plug2 } from "lucide-react";
+import { Bell, Command, Search, Sparkles, Plug2, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { LiveDot } from "./Delta";
+import { useAuth } from "@/lib/auth-context";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function Topbar() {
   const [now, setNow] = useState(() => new Date());
+  const { user, signOut } = useAuth();
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
@@ -11,6 +21,9 @@ export function Topbar() {
 
   const time = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
   const date = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+
+  const email = user?.email ?? "";
+  const initials = (email.split("@")[0] || "U").slice(0, 2).toUpperCase();
 
   return (
     <header className="h-14 hairline-b flex items-center gap-4 px-5 bg-[oklch(0.17_0.013_260/0.6)] backdrop-blur-xl sticky top-0 z-30">
@@ -49,9 +62,25 @@ export function Topbar() {
           <Bell className="h-4 w-4" />
           <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-bear glow-bear" />
         </button>
-        <div className="h-9 w-9 rounded-full gradient-primary grid place-items-center text-[11px] font-bold text-background">
-          AK
-        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="h-9 w-9 rounded-full gradient-primary grid place-items-center text-[11px] font-bold text-background hover:opacity-90 transition">
+              {initials}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel className="flex flex-col gap-0.5">
+              <span className="text-xs text-muted-foreground font-normal">Signed in as</span>
+              <span className="truncate text-sm">{email}</span>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => signOut()} className="text-bear focus:text-bear">
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );

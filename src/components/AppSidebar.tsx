@@ -61,8 +61,8 @@ function Item({ to, label, icon: Icon }: { to: string; label: string; icon: any 
 
 export function AppSidebar() {
   return (
-    <aside className="hidden md:flex flex-col w-[240px] shrink-0 bg-sidebar hairline-r">
-      <div className="flex items-center gap-2.5 px-5 h-14 hairline-b">
+    <aside className="hidden md:flex flex-col w-[240px] shrink-0 bg-sidebar hairline-r sticky top-0 h-screen">
+      <div className="flex items-center gap-2.5 px-5 h-14 hairline-b shrink-0">
         <div className="relative">
           <div className="h-7 w-7 rounded-lg gradient-primary grid place-items-center glow-primary">
             <TrendingUp className="h-4 w-4 text-background" strokeWidth={2.5} />
@@ -74,7 +74,7 @@ export function AppSidebar() {
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-6">
+      <nav className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-3 space-y-6">
         <div className="space-y-1">
           <div className="px-3 pb-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Trading</div>
           {NAV.map((n) => <Item key={n.to} {...n} />)}
@@ -88,15 +88,6 @@ export function AppSidebar() {
           {SYS.map((n) => <Item key={n.to} {...n} />)}
         </div>
       </nav>
-
-      <div className="m-3 rounded-xl glass p-3 relative overflow-hidden">
-        <div className="absolute -top-10 -right-10 h-24 w-24 rounded-full bg-primary/20 blur-2xl" />
-        <div className="text-xs font-medium">Upgrade to Pro</div>
-        <div className="text-[11px] text-muted-foreground mt-1">Realtime L2, AI signals, unlimited alerts.</div>
-        <button className="mt-3 w-full rounded-md gradient-primary text-background text-xs font-semibold py-1.5">
-          Upgrade
-        </button>
-      </div>
     </aside>
   );
 }

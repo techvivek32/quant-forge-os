@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+
 import { TrendingUp, Loader2, Mail, Lock, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -10,7 +11,6 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -26,19 +26,9 @@ function AuthPage() {
     if (busy) return;
     setBusy(true);
     try {
-      if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: `${window.location.origin}/` },
-        });
-        if (error) throw error;
-        toast.success("Account created. Logging you in…");
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        toast.success("Welcome back.");
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      toast.success("Welcome back.");
     } catch (err: any) {
       toast.error(err?.message ?? "Authentication failed");
     } finally {
@@ -65,14 +55,8 @@ function AuthPage() {
         </div>
 
         <div className="glass rounded-2xl p-7 hairline">
-          <h1 className="text-xl font-semibold tracking-tight">
-            {mode === "signin" ? "Sign in to NOVA" : "Create your account"}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {mode === "signin"
-              ? "Access your AI trading terminal."
-              : "Start trading with AI-powered insights."}
-          </p>
+          <h1 className="text-xl font-semibold tracking-tight">Sign in to NOVA</h1>
+          <p className="text-sm text-muted-foreground mt-1">Access your AI trading terminal.</p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-3">
             <div className="relative">
@@ -93,7 +77,7 @@ function AuthPage() {
                 type="password"
                 required
                 minLength={6}
-                autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                autoComplete="current-password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -108,30 +92,12 @@ function AuthPage() {
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : (
                 <>
-                  {mode === "signin" ? "Sign in" : "Create account"}
+                  Sign in
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
             </button>
           </form>
-
-          <div className="mt-5 text-center text-xs text-muted-foreground">
-            {mode === "signin" ? (
-              <>
-                Don't have an account?{" "}
-                <button onClick={() => setMode("signup")} className="text-primary hover:underline font-medium">
-                  Sign up
-                </button>
-              </>
-            ) : (
-              <>
-                Already have an account?{" "}
-                <button onClick={() => setMode("signin")} className="text-primary hover:underline font-medium">
-                  Sign in
-                </button>
-              </>
-            )}
-          </div>
         </div>
 
         <p className="text-center text-[11px] text-muted-foreground mt-6">

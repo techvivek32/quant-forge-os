@@ -21,6 +21,9 @@ dist-ssr
 .env.*
 !.env.example
 
+# Supabase seed with credentials
+supabase/migrations/002_seed_user.sql
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars

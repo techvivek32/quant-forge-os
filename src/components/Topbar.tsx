@@ -1,7 +1,9 @@
 import { Bell, Command, Search, Sparkles, Plug2, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { LiveDot } from "./Delta";
 import { useAuth } from "@/lib/auth-context";
+import { getAuthStatus } from "@/lib/api/ibkr";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,10 +16,21 @@ import {
 export function Topbar() {
   const [now, setNow] = useState(() => new Date());
   const { user, signOut } = useAuth();
+  
+  const { data: authStatus } = useQuery({
+    queryKey: ["ibkr-auth"],
+    queryFn: getAuthStatus,
+    refetchInterval: 30_000,
+  });
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // Market status
+  const marketHours = now.getHours();
+  const isWeekday = now.getDay() >= 1 && now.getDay() <= 5;
+  const isMarketOpen = isWeekday && marketHours >= 9 && marketHours < 16;
 
   const time = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
   const date = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -28,13 +41,18 @@ export function Topbar() {
   return (
     <header className="h-14 hairline-b flex items-center gap-4 px-5 bg-[oklch(0.17_0.013_260/0.6)] backdrop-blur-xl sticky top-0 z-30">
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-2 rounded-full bg-[oklch(0.78_0.18_152/0.12)] px-2.5 py-1 text-[11px] font-medium text-bull">
+        <div className={`flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+          isMarketOpen 
+            ? 'bg-[oklch(0.78_0.18_152/0.12)] text-bull' 
+            : 'bg-[oklch(0.66_0.22_22/0.12)] text-bear'
+        }`}>
           <LiveDot />
-          Market Open
+          Market {isMarketOpen ? 'Open' : 'Closed'}
         </div>
         <div className="text-xs text-muted-foreground num">{date} · {time} ET</div>
       </div>
 
+      {/* Search Bar */}
       <div className="flex-1 max-w-xl mx-auto">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -49,9 +67,13 @@ export function Topbar() {
       </div>
 
       <div className="flex items-center gap-2">
-        <button className="hidden md:inline-flex items-center gap-2 rounded-lg hairline bg-surface-1 px-3 h-9 text-xs hover:bg-surface-2 transition">
-          <Plug2 className="h-3.5 w-3.5 text-bull" />
-          <span>IBKR Connected</span>
+        <button className={`hidden md:inline-flex items-center gap-2 rounded-lg hairline px-3 h-9 text-xs transition ${
+          authStatus?.connected 
+            ? 'bg-[oklch(0.78_0.18_152/0.12)] text-bull hover:bg-[oklch(0.78_0.18_152/0.18)]'
+            : 'bg-[oklch(0.66_0.22_22/0.12)] text-bear hover:bg-[oklch(0.66_0.22_22/0.18)]'
+        }`}>
+          <Plug2 className="h-3.5 w-3.5" />
+          <span>IBKR {authStatus?.connected ? 'Connected' : 'Disconnected'}</span>
           <LiveDot />
         </button>
         <button className="inline-flex items-center gap-2 rounded-lg gradient-primary text-background px-3 h-9 text-xs font-semibold glow-primary">

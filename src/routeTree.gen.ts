@@ -23,6 +23,7 @@ import { Route as AppJournalRouteImport } from './routes/_app.journal'
 import { Route as AppCopilotRouteImport } from './routes/_app.copilot'
 import { Route as AppBrokerRouteImport } from './routes/_app.broker'
 import { Route as AppAlertsRouteImport } from './routes/_app.alerts'
+import { Route as AppStockSymbolRouteImport } from './routes/_app.stock.$symbol'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -93,6 +94,11 @@ const AppAlertsRoute = AppAlertsRouteImport.update({
   path: '/alerts',
   getParentRoute: () => AppRoute,
 } as any)
+const AppStockSymbolRoute = AppStockSymbolRouteImport.update({
+  id: '/stock/$symbol',
+  path: '/stock/$symbol',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/scanner': typeof AppScannerRoute
   '/settings': typeof AppSettingsRoute
   '/watchlist': typeof AppWatchlistRoute
+  '/stock/$symbol': typeof AppStockSymbolRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
@@ -123,6 +130,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/watchlist': typeof AppWatchlistRoute
   '/': typeof AppIndexRoute
+  '/stock/$symbol': typeof AppStockSymbolRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -140,6 +148,7 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/watchlist': typeof AppWatchlistRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/stock/$symbol': typeof AppStockSymbolRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -157,6 +166,7 @@ export interface FileRouteTypes {
     | '/scanner'
     | '/settings'
     | '/watchlist'
+    | '/stock/$symbol'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
@@ -172,6 +182,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/watchlist'
     | '/'
+    | '/stock/$symbol'
   id:
     | '__root__'
     | '/_app'
@@ -188,6 +199,7 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/watchlist'
     | '/_app/'
+    | '/_app/stock/$symbol'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -295,6 +307,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAlertsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/stock/$symbol': {
+      id: '/_app/stock/$symbol'
+      path: '/stock/$symbol'
+      fullPath: '/stock/$symbol'
+      preLoaderRoute: typeof AppStockSymbolRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -311,6 +330,7 @@ interface AppRouteChildren {
   AppSettingsRoute: typeof AppSettingsRoute
   AppWatchlistRoute: typeof AppWatchlistRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppStockSymbolRoute: typeof AppStockSymbolRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -326,6 +346,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsRoute: AppSettingsRoute,
   AppWatchlistRoute: AppWatchlistRoute,
   AppIndexRoute: AppIndexRoute,
+  AppStockSymbolRoute: AppStockSymbolRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

@@ -4,7 +4,6 @@ const ACCOUNT = import.meta.env.VITE_IBKR_ACCOUNT_ID ?? "U25901412";
 let sessionReady = false;
 
 async function ibkr<T>(path: string, options?: RequestInit): Promise<T> {
-  // Initialize session on first call
   if (!sessionReady) {
     await fetch(`${BASE}/tickle`, { method: "POST", credentials: "include" }).catch(() => {});
     sessionReady = true;
@@ -15,7 +14,6 @@ async function ibkr<T>(path: string, options?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json", ...options?.headers },
   });
   if (res.status === 401) {
-    // Re-tickle and retry once
     sessionReady = false;
     await fetch(`${BASE}/tickle`, { method: "POST", credentials: "include" }).catch(() => {});
     const retry = await fetch(`${BASE}${path}`, {
@@ -30,12 +28,14 @@ async function ibkr<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
-// Keep session alive — call every 60s
 export async function tickle() {
   return ibkr<{ session: string; ssoExpires: number }>("/tickle", { method: "POST" });
 }
 
-// Account summary — equity, buying power, margin
+export async function getAuthStatus() {
+  return ibkr<{ authenticated: boolean; connected: boolean; competing: boolean }>("/iserver/auth/status");
+}
+
 export async function getAccountSummary() {
   const data = await ibkr<Record<string, { amount: number; currency: string }>>(`/portfolio/${ACCOUNT}/summary`);
   return {
@@ -51,7 +51,6 @@ export async function getAccountSummary() {
   };
 }
 
-// Open positions
 export async function getPositions() {
   const data = await ibkr<any[]>(`/portfolio/${ACCOUNT}/positions/0`);
   return (data ?? []).map((p) => ({
@@ -70,7 +69,6 @@ export async function getPositions() {
   }));
 }
 
-// Live orders
 export async function getOrders() {
   const data = await ibkr<{ orders: any[] }>("/iserver/account/orders");
   return (data?.orders ?? []).map((o) => ({
@@ -92,9 +90,7 @@ function mapStatus(s: string) {
   return "Rejected";
 }
 
-// Place order
 export async function placeOrder(symbol: string, side: "BUY" | "SELL", qty: number, orderType: string, price?: number, stop?: number, tp?: number) {
-  // First get conid for symbol
   const search = await ibkr<any[]>(`/iserver/secdef/search?symbol=${symbol}&name=false&secType=STK`);
   const conid = search?.[0]?.conid;
   if (!conid) throw new Error(`Symbol ${symbol} not found`);
@@ -109,7 +105,6 @@ export async function placeOrder(symbol: string, side: "BUY" | "SELL", qty: numb
     ...(stop ? { auxPrice: stop } : {}),
   }];
 
-  // Bracket order
   if (stop && tp) {
     orders.push(
       { conid, orderType: "STP", side: side === "BUY" ? "SELL" : "BUY", quantity: qty, auxPrice: stop, tif: "GTC" },
@@ -123,20 +118,36 @@ export async function placeOrder(symbol: string, side: "BUY" | "SELL", qty: numb
   });
 }
 
-// Cancel order
 export async function cancelOrder(orderId: string) {
   return ibkr<any>(`/iserver/account/${ACCOUNT}/order/${orderId}`, { method: "DELETE" });
 }
 
-// Known conids for major symbols
 export const CONIDS: Record<string, number> = {
-  AAPL: 265598, MSFT: 272093, NVDA: 107113386, GOOGL: 208813720,
-  AMZN: 3691937, META: 107113386, TSLA: 76792991, JPM: 1520593,
-  SPX: 416904, NDX: 825720, VIX: 13455763,
+  AAPL: 265598,
+  MSFT: 272093,
+  NVDA: 4815747,
+  GOOGL: 208813720,
+  AMZN: 3691937,
+  TSLA: 76792991,
+  JPM: 1520593,
+  META: 107113386,
+  NFLX: 14958181,
+  AMD: 4391,
+  INTC: 270639,
+  BABA: 147591386,
+  DIS: 2877,
+  BA: 4762,
+  GE: 4503,
+  SPX: 416904,
+  NDX: 825720,
+  VIX: 13455763,
 };
 
-// Get market data snapshot for multiple conids
 export async function getMarketSnapshot(conids: number[]) {
+  // First call subscribes to stream
+  await ibkr<any[]>(`/iserver/marketdata/snapshot?conids=${conids.join(",")}&fields=31,83,84,85,86,87,88`).catch(() => {});
+  await new Promise((r) => setTimeout(r, 800));
+  // Second call returns populated data
   const data = await ibkr<any[]>(`/iserver/marketdata/snapshot?conids=${conids.join(",")}&fields=31,83,84,85,86,87,88`);
   return (data ?? []).map((d) => ({
     conid: d.conid,
@@ -144,12 +155,17 @@ export async function getMarketSnapshot(conids: number[]) {
     changePct: parseFloat(d["83"] ?? "0"),
     bid: parseFloat(d["84"] ?? "0"),
     ask: parseFloat(d["85"] ?? "0"),
-    volume: parseInt(d["86"] ?? "0"),
+    volume: d["87_raw"] ? Math.round(d["87_raw"] / 100) : parseInt(d["86"] ?? "0"),
     open: parseFloat(d["88"] ?? "0"),
+    updated: d["_updated"] ?? 0,
   }));
 }
 
-// Auth status
-export async function getAuthStatus() {
-  return ibkr<{ authenticated: boolean; connected: boolean; competing: boolean }>("/iserver/auth/status");
+export async function getChartData(conid: number, period = "1d", bar = "5min") {
+  const data = await ibkr<any>(`/iserver/marketdata/history?conid=${conid}&period=${period}&bar=${bar}&outsideRth=false`);
+  return (data?.data ?? []).map((d: any) => ({
+    t: d.t,
+    o: d.o, h: d.h, l: d.l, c: d.c, v: d.v,
+    time: new Date(d.t).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+  }));
 }

@@ -7,18 +7,18 @@ const TICKER_SYMBOLS = [
   { symbol: "AAPL", conid: 265598 },
   { symbol: "MSFT", conid: 272093 },
   { symbol: "NVDA", conid: 4815747 },
-  { symbol: "GOOGL", conid: 208813720 },
+  { symbol: "GOOGL", conid: 208813719 },
   { symbol: "AMZN", conid: 3691937 },
   { symbol: "META", conid: 107113386 },
   { symbol: "TSLA", conid: 76792991 },
   { symbol: "JPM", conid: 1520593 },
-  { symbol: "V", conid: 4815747 },
-  { symbol: "UNH", conid: 208813720 },
-  { symbol: "AVGO", conid: 272093 },
-  { symbol: "NFLX", conid: 14958181 },
+  { symbol: "V", conid: 49462172 },
+  { symbol: "NFLX", conid: 15124833 },
   { symbol: "AMD", conid: 4391 },
   { symbol: "INTC", conid: 270639 },
   { symbol: "DIS", conid: 2877 },
+  { symbol: "VZ", conid: 4901 },
+  { symbol: "BABA", conid: 147591386 },
 ];
 
 export function Ticker() {

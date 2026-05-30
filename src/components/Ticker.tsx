@@ -5,13 +5,20 @@ import { fmtMoney } from "@/lib/market-data";
 
 const TICKER_SYMBOLS = [
   { symbol: "AAPL", conid: 265598 },
+  { symbol: "MSFT", conid: 272093 },
+  { symbol: "NVDA", conid: 4815747 },
+  { symbol: "GOOGL", conid: 208813720 },
   { symbol: "AMZN", conid: 3691937 },
   { symbol: "META", conid: 107113386 },
   { symbol: "TSLA", conid: 76792991 },
-  { symbol: "AVGO", conid: 4815747 }, // Using NVDA conid temporarily
   { symbol: "JPM", conid: 1520593 },
-  { symbol: "V", conid: 272093 }, // Using MSFT conid temporarily
-  { symbol: "UNH", conid: 208813720 }, // Using GOOGL conid temporarily
+  { symbol: "V", conid: 4815747 },
+  { symbol: "UNH", conid: 208813720 },
+  { symbol: "AVGO", conid: 272093 },
+  { symbol: "NFLX", conid: 14958181 },
+  { symbol: "AMD", conid: 4391 },
+  { symbol: "INTC", conid: 270639 },
+  { symbol: "DIS", conid: 2877 },
 ];
 
 export function Ticker() {

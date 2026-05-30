@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { Sparkline } from "@/components/Sparkline";
 import { Delta, LiveDot } from "@/components/Delta";
 import { INDICES, QUOTES, SECTORS, fmtCompact, fmtMoney, topMovers } from "@/lib/market-data";
+import { getAccountSummary, getPositions } from "@/lib/api/ibkr";
 import {
   Activity,
   Brain,
@@ -79,14 +81,31 @@ function Dashboard() {
   const movers = topMovers("volume");
   const fgIndex = 72;
 
+  const { data: summary } = useQuery({
+    queryKey: ["ibkr-summary"],
+    queryFn: getAccountSummary,
+    refetchInterval: 10_000,
+  });
+
+  const { data: positions = [] } = useQuery({
+    queryKey: ["ibkr-positions"],
+    queryFn: getPositions,
+    refetchInterval: 10_000,
+  });
+
+  const totalPnl = positions.reduce((a, p) => a + (p.pnl ?? 0), 0);
+  const openCount = positions.length;
+  const netLiq = summary?.netLiquidation ?? 0;
+  const buyingPower = summary?.buyingPower ?? 0;
+
   return (
     <div className="p-6 space-y-6">
       {/* Hero KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Portfolio Value" value={`$${fmtMoney(124_582.34)}`} delta={1.24} icon={Activity} accent="primary" />
-        <StatCard label="Day P&L" value="+$1,842.10" delta={1.51} icon={TrendingUp} accent="bull" />
-        <StatCard label="Open Positions" value="14" delta={-0.32} icon={Gauge} accent="violet" />
-        <StatCard label="Buying Power" value={`$${fmtMoney(48_210.55)}`} icon={Zap} accent="primary" />
+        <StatCard label="Portfolio Value" value={`$${fmtMoney(netLiq)}`} delta={netLiq > 0 ? ((netLiq - 10000) / 10000) * 100 : 0} icon={Activity} accent="primary" />
+        <StatCard label="Unrealized P&L" value={`${totalPnl >= 0 ? "+" : ""}$${fmtMoney(totalPnl)}`} delta={netLiq > 0 ? (totalPnl / netLiq) * 100 : 0} icon={TrendingUp} accent="bull" />
+        <StatCard label="Open Positions" value={String(openCount)} icon={Gauge} accent="violet" />
+        <StatCard label="Buying Power" value={`$${fmtMoney(buyingPower)}`} icon={Zap} accent="primary" />
       </div>
 
       {/* Equity curve + sentiment */}

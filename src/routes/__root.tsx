@@ -119,7 +119,11 @@ function AuthListener() {
       router.invalidate();
       qc.invalidateQueries();
     });
-    return () => subscription.unsubscribe();
+    // Keep IBKR session alive every 60s
+    const ibkrPing = setInterval(() => {
+      fetch("/ibkr/tickle", { method: "POST" }).catch(() => {});
+    }, 60_000);
+    return () => { subscription.unsubscribe(); clearInterval(ibkrPing); };
   }, [router, qc]);
   return null;
 }

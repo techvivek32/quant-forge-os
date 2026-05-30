@@ -202,12 +202,12 @@ function StockDetail() {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold">{symbol}</h1>
+            <h1 className="text-xl font-bold">{symbol}</h1>
             {quote && (
-              <div className="flex items-center gap-3 mt-1">
-                <span className="text-3xl font-bold num">${quote.last?.toFixed(2)}</span>
-                <span className={`flex items-center gap-1 text-lg font-semibold ${isPositive ? "text-bull" : "text-bear"}`}>
-                  {isPositive ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-2xl font-bold num">${quote.last?.toFixed(2)}</span>
+                <span className={`flex items-center gap-1 text-base font-semibold ${isPositive ? "text-bull" : "text-bear"}`}>
+                  {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                   {isPositive ? "+" : ""}{changePct.toFixed(2)}%
                 </span>
               </div>
@@ -278,7 +278,7 @@ function StockDetail() {
             </div>
 
             {/* Main Chart */}
-            <div className="h-[400px] relative" ref={setChartContainerRef}>
+            <div className="h-[300px] relative" ref={setChartContainerRef}>
               {chartData.length === 0 ? (
                 <div className="h-full flex items-center justify-center">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -363,13 +363,13 @@ function StockDetail() {
                 top: 0, 
                 left: 60, 
                 right: 8, 
-                height: 400,
+                height: 300,
                 pointerEvents: "none"
               }}>
                 <CandlestickChart 
                   data={chartData}
                   width={chartContainerRef.offsetWidth - 68}
-                  height={400}
+                  height={300}
                   yDomain={yDomain}
                 />
               </div>
@@ -377,7 +377,7 @@ function StockDetail() {
 
             {/* Volume Chart */}
             {indicators.includes("Volume") && (
-              <div className="h-[80px] mt-2">
+              <div className="h-[60px] mt-2">
                 <ResponsiveContainer>
                   <BarChart data={chartData} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
                     <YAxis hide />
@@ -393,7 +393,7 @@ function StockDetail() {
 
             {/* RSI Indicator */}
             {indicators.includes("RSI") && (
-              <div className="h-[100px] mt-2">
+              <div className="h-[80px] mt-2">
                 <ResponsiveContainer>
                   <ComposedChart data={chartData} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
                     <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} width={40} />

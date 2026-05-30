@@ -11,6 +11,9 @@ export function CandlestickChart({
   height: number;
   yDomain?: [number, number];
 }) {
+  const [hoveredCandle, setHoveredCandle] = useState<{ index: number; x: number; y: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
   const candles = useMemo(() => {
     if (!data.length) return [];
     
@@ -45,48 +48,131 @@ export function CandlestickChart({
         bodyHeight,
         candleWidth,
         isUp,
+        data: d,
       };
     });
   }, [data, width, height, yDomain]);
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Find the closest candle
+    const barWidth = width / data.length;
+    const candleIndex = Math.floor(x / barWidth);
+    
+    if (candleIndex >= 0 && candleIndex < candles.length) {
+      const candle = candles[candleIndex];
+      // Check if mouse is within candle bounds
+      if (Math.abs(x - candle.x) <= candle.candleWidth / 2 + 5) {
+        setHoveredCandle({ index: candleIndex, x: e.clientX, y: e.clientY });
+      } else {
+        setHoveredCandle(null);
+      }
+    } else {
+      setHoveredCandle(null);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredCandle(null);
+  };
+
+  const formatTime = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
   
   if (!data.length) return null;
   
   return (
-    <svg 
-      width={width} 
-      height={height}
-      style={{ 
-        position: "absolute", 
-        top: 0, 
-        left: 0, 
-        pointerEvents: "none",
-        zIndex: 10
-      }}
-    >
-      {candles.map((candle, i) => (
-        <g key={i}>
-          {/* Wick */}
-          <line
-            x1={candle.x}
-            y1={candle.yHigh}
-            x2={candle.x}
-            y2={candle.yLow}
-            stroke={candle.isUp ? "#22c55e" : "#ef4444"}
-            strokeWidth={1}
-          />
-          {/* Body */}
-          <rect
-            x={candle.x - candle.candleWidth / 2}
-            y={candle.bodyTop}
-            width={candle.candleWidth}
-            height={candle.bodyHeight}
-            fill={candle.isUp ? "#22c55e" : "#ef4444"}
-            stroke={candle.isUp ? "#22c55e" : "#ef4444"}
-            strokeWidth={0.5}
-            rx={0.5}
-          />
-        </g>
-      ))}
-    </svg>
+    <>
+      <svg 
+        ref={svgRef}
+        width={width} 
+        height={height}
+        style={{ 
+          position: "absolute", 
+          top: 0, 
+          left: 0, 
+          pointerEvents: "all",
+          zIndex: 10
+        }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+      >
+        {candles.map((candle, i) => (
+          <g key={i}>
+            {/* Wick */}
+            <line
+              x1={candle.x}
+              y1={candle.yHigh}
+              x2={candle.x}
+              y2={candle.yLow}
+              stroke={candle.isUp ? "#22c55e" : "#ef4444"}
+              strokeWidth={1}
+            />
+            {/* Body */}
+            <rect
+              x={candle.x - candle.candleWidth / 2}
+              y={candle.bodyTop}
+              width={candle.candleWidth}
+              height={candle.bodyHeight}
+              fill={candle.isUp ? "#22c55e" : "#ef4444"}
+              stroke={candle.isUp ? "#22c55e" : "#ef4444"}
+              strokeWidth={0.5}
+              rx={0.5}
+            />
+            {/* Invisible hover area */}
+            <rect
+              x={candle.x - candle.candleWidth / 2 - 5}
+              y={0}
+              width={candle.candleWidth + 10}
+              height={height}
+              fill="transparent"
+              style={{ cursor: 'crosshair' }}
+            />
+          </g>
+        ))}
+      </svg>
+      
+      {/* Tooltip */}
+      {hoveredCandle && (
+        <div
+          style={{
+            position: 'fixed',
+            left: hoveredCandle.x - 250,
+            top: hoveredCandle.y - 150,
+            background: 'oklch(0.20 0.015 260)',
+            border: '1px solid oklch(1 0 0 / 10%)',
+            borderRadius: '8px',
+            padding: '8px 12px',
+            fontSize: '11px',
+            color: 'white',
+            zIndex: 1000,
+            pointerEvents: 'none',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+          }}
+        >
+          <div style={{ marginBottom: '4px', fontWeight: 'bold' }}>
+            {formatTime(candles[hoveredCandle.index].data.t)}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
+            <div>Open: <span style={{ color: '#22c55e' }}>${candles[hoveredCandle.index].data.o.toFixed(2)}</span></div>
+            <div>High: <span style={{ color: '#22c55e' }}>${candles[hoveredCandle.index].data.h.toFixed(2)}</span></div>
+            <div>Low: <span style={{ color: '#ef4444' }}>${candles[hoveredCandle.index].data.l.toFixed(2)}</span></div>
+            <div>Close: <span style={{ color: candles[hoveredCandle.index].data.c >= candles[hoveredCandle.index].data.o ? '#22c55e' : '#ef4444' }}>${candles[hoveredCandle.index].data.c.toFixed(2)}</span></div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

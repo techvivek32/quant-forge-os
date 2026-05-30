@@ -369,7 +369,7 @@ function StockDetail() {
                 <CandlestickChart 
                   data={chartData}
                   width={chartContainerRef.offsetWidth - 68}
-                  height={290}
+                  height={280}
                   yDomain={yDomain}
                 />
               </div>

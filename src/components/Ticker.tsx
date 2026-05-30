@@ -1,7 +1,40 @@
-import { QUOTES, fmtMoney } from "@/lib/market-data";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { getMarketSnapshot } from "@/lib/api/ibkr";
+import { fmtMoney } from "@/lib/market-data";
+
+const TICKER_SYMBOLS = [
+  { symbol: "AAPL", conid: 265598 },
+  { symbol: "AMZN", conid: 3691937 },
+  { symbol: "META", conid: 107113386 },
+  { symbol: "TSLA", conid: 76792991 },
+  { symbol: "AVGO", conid: 4815747 }, // Using NVDA conid temporarily
+  { symbol: "JPM", conid: 1520593 },
+  { symbol: "V", conid: 272093 }, // Using MSFT conid temporarily
+  { symbol: "UNH", conid: 208813720 }, // Using GOOGL conid temporarily
+];
 
 export function Ticker() {
-  const items = [...QUOTES, ...QUOTES];
+  const navigate = useNavigate();
+  
+  const { data: quotes = [] } = useQuery({
+    queryKey: ["ticker-quotes"],
+    queryFn: () => getMarketSnapshot(TICKER_SYMBOLS.map(s => s.conid)),
+    refetchInterval: 3_000,
+    staleTime: 2_000,
+  });
+
+  // Enrich ticker data with real quotes
+  const tickerData = TICKER_SYMBOLS.map((s) => {
+    const quote = quotes.find((q) => q.conid === s.conid);
+    return {
+      symbol: s.symbol,
+      price: quote?.last ?? 0,
+      changePct: quote?.changePct ?? 0,
+    };
+  }).filter(s => s.price > 0);
+
+  const items = [...tickerData, ...tickerData]; // Duplicate for seamless scrolling
   return (
     <div className="relative overflow-hidden hairline-b bg-[oklch(0.17_0.013_260/0.7)] backdrop-blur-md">
       <div className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-background to-transparent z-10" />
@@ -10,7 +43,11 @@ export function Ticker() {
         {items.map((q, i) => {
           const up = q.changePct >= 0;
           return (
-            <div key={i} className="flex items-center gap-2 text-xs">
+            <div 
+              key={i} 
+              onClick={() => navigate({ to: `/stock/${q.symbol}` })}
+              className="flex items-center gap-2 text-xs cursor-pointer hover:bg-surface-2 rounded px-2 py-1 transition"
+            >
               <span className="font-semibold tracking-wide">{q.symbol}</span>
               <span className="num text-muted-foreground">{fmtMoney(q.price)}</span>
               <span className={`num ${up ? "text-bull" : "text-bear"}`}>

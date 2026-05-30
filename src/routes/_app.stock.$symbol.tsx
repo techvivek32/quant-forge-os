@@ -360,8 +360,8 @@ function StockDetail() {
             {chartType === "Candlestick" && chartData.length > 0 && chartContainerRef && (
               <div style={{ 
                 position: "absolute", 
-                top: 0, 
-                left: 60, 
+                top: 155, 
+                left: 80, 
                 right: 8, 
                 height: 300,
                 pointerEvents: "none"
@@ -369,7 +369,7 @@ function StockDetail() {
                 <CandlestickChart 
                   data={chartData}
                   width={chartContainerRef.offsetWidth - 68}
-                  height={300}
+                  height={290}
                   yDomain={yDomain}
                 />
               </div>

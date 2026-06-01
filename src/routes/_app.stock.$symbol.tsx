@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { ArrowLeft, TrendingUp, TrendingDown, Activity, Loader2, Zap, AlertTriangle, Bell, BookmarkPlus } from "lucide-react";
-import { ResponsiveContainer, ComposedChart, BarChart, Line, Area, Bar, XAxis, YAxis, Tooltip, Cell, ReferenceLine } from "recharts";
+import { ResponsiveContainer, ComposedChart, BarChart, Line, Area, Bar, XAxis, YAxis, Tooltip, Cell, ReferenceLine, ReferenceArea } from "recharts";
 import { ChartDrawingTools, AdvancedIndicators, enhanceDataWithIndicators, type DrawingTool, type Drawing } from "@/components/ChartTools";
 import { CandlestickChart } from "@/components/CandlestickChart";
 import { getChartData, getMarketSnapshot, CONIDS } from "@/lib/api/ibkr";
@@ -12,8 +12,8 @@ export const Route = createFileRoute("/_app/stock/$symbol")({
 });
 
 const PERIODS = [
-  { label: "1D", days: 1, period: "1d", bar: "1min" },
-  { label: "5D", days: 5, period: "1w", bar: "5min" },
+  { label: "1D", days: 1, period: "1d", bar: "2min" },
+  { label: "5D", days: 5, period: "1w", bar: "15min" },
   { label: "1M", days: 30, period: "1m", bar: "1h" },
   { label: "6M", days: 180, period: "6m", bar: "4h" },
   { label: "1Y", days: 365, period: "1y", bar: "1d" },
@@ -154,6 +154,193 @@ function StockDetail() {
     }
   };
 
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [currentDrawing, setCurrentDrawing] = useState<Drawing | null>(null);
+
+  // Reset drawing state when tool changes
+  useEffect(() => {
+    setIsDrawing(false);
+    setCurrentDrawing(null);
+  }, [activeTool]);
+
+  const handleChartMouseDown = (e: any) => {
+    if (activeTool === "none" || !e) return;
+    
+    // Get time from activeLabel (X-axis)
+    const t = e.activeLabel;
+    
+    // Calculate price from chartY (Y-axis)
+    // We use the chartContainerRef and yDomain to manually invert the Y coordinate
+    const chartHeight = 260 - 30; // height - margins
+    const yOffset = e.chartY - 10; // chartY - top margin
+    const priceRange = yDomain[1] - yDomain[0];
+    const p = yDomain[1] - (yOffset / chartHeight) * priceRange;
+
+    if (!t || isNaN(p)) return;
+
+    const point = { t, p };
+
+    if (!isDrawing) {
+      const newDrawing: Drawing = {
+        id: Math.random().toString(36).substr(2, 9),
+        type: activeTool,
+        points: [point, point],
+        color: "oklch(0.74 0.18 235)",
+      };
+      setIsDrawing(true);
+      setCurrentDrawing(newDrawing);
+    } else {
+      if (currentDrawing) {
+        setDrawings([...drawings, {
+          ...currentDrawing,
+          points: [currentDrawing.points[0], point]
+        }]);
+      }
+      setIsDrawing(false);
+      setCurrentDrawing(null);
+    }
+  };
+
+  const handleChartMouseMove = (e: any) => {
+    if (!isDrawing || !currentDrawing || !e) return;
+    
+    const t = e.activeLabel;
+    const chartHeight = 260 - 30;
+    const yOffset = e.chartY - 10;
+    const priceRange = yDomain[1] - yDomain[0];
+    const p = yDomain[1] - (yOffset / chartHeight) * priceRange;
+
+    if (!t || isNaN(p)) return;
+
+    setCurrentDrawing({
+      ...currentDrawing,
+      points: [currentDrawing.points[0], { t, p }],
+    });
+  };
+
+  const handleChartMouseUp = () => {
+    // Logic moved to handleChartMouseDown for 2-click system
+  };
+
+  const renderDrawings = () => {
+    const allDrawings = [...drawings];
+    if (currentDrawing) allDrawings.push(currentDrawing);
+
+    return allDrawings.map((drawing) => {
+      const p1 = drawing.points[0];
+      const p2 = drawing.points[1];
+
+      if (drawing.type === "vertical") {
+        return (
+          <ReferenceLine
+            key={drawing.id}
+            x={p1.t}
+            stroke={drawing.color}
+            strokeWidth={2}
+            strokeDasharray="3 3"
+          />
+        );
+      }
+      if (drawing.type === "trendline") {
+        return (
+          <ReferenceArea
+            key={drawing.id}
+            x1={p1.t}
+            x2={p2.t}
+            y1={p1.p}
+            y2={p2.p}
+            stroke="none"
+            fill="none"
+            shape={(props: any) => {
+              const { x: x1, y: y1, width, height } = props;
+              const x2 = x1 + width;
+              const y2 = y1 + height;
+              
+              const startX = p1.t <= p2.t ? x1 : x2;
+              const endX = p1.t <= p2.t ? x2 : x1;
+              const startY = p1.p >= p2.p ? y1 : y2;
+              const endY = p1.p >= p2.p ? y2 : y1;
+
+              if (width < 2 && height < 2 && !isDrawing) return null;
+
+              return (
+                <line 
+                  x1={startX} y1={startY} 
+                  x2={endX} y2={endY} 
+                  stroke={drawing.color} strokeWidth={2} 
+                />
+              );
+            }}
+          />
+        );
+      }
+      if (drawing.type === "horizontal") {
+        return (
+          <ReferenceLine
+            key={drawing.id}
+            y={p1.p}
+            stroke={drawing.color}
+            strokeWidth={2}
+            strokeDasharray="3 3"
+          />
+        );
+      }
+      if (drawing.type === "rectangle") {
+        const t1 = Math.min(p1.t, p2.t);
+        const t2 = Math.max(p1.t, p2.t);
+        const v1 = Math.min(p1.p, p2.p);
+        const v2 = Math.max(p1.p, p2.p);
+        return (
+          <ReferenceArea
+            key={drawing.id}
+            x1={t1}
+            x2={t2}
+            y1={v1}
+            y2={v2}
+            stroke={drawing.color}
+            strokeWidth={1.5}
+            fill={drawing.color}
+            fillOpacity={0.15}
+          />
+        );
+      }
+      if (drawing.type === "circle") {
+        const centerX = p1.t;
+        const centerY = p1.p;
+        // Simple circle approximation using ReferenceArea with rounded corners isn't possible,
+        // so we use a ReferenceArea with a custom shape or just a highlighted region
+        return (
+          <ReferenceArea
+            key={drawing.id}
+            x1={p1.t}
+            x2={p2.t}
+            y1={p1.p}
+            y2={p2.p}
+            stroke={drawing.color}
+            strokeWidth={1.5}
+            fill={drawing.color}
+            fillOpacity={0.15}
+            shape={(props: any) => {
+              const { x, y, width, height } = props;
+              const rx = width / 2;
+              const ry = height / 2;
+              const cx = x + rx;
+              const cy = y + ry;
+              return (
+                <ellipse 
+                  cx={cx} cy={cy} rx={Math.abs(rx)} ry={Math.abs(ry)} 
+                  fill={drawing.color} fillOpacity={0.15} 
+                  stroke={drawing.color} strokeWidth={1.5} 
+                />
+              );
+            }}
+          />
+        );
+      }
+      return null;
+    });
+  };
+
   const xFormatter = (t: number) => {
     if (!t) return "";
     const d = new Date(t);
@@ -285,7 +472,13 @@ function StockDetail() {
                 </div>
               ) : (
                 <ResponsiveContainer>
-                  <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                  <ComposedChart 
+                    data={chartData} 
+                    margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
+                    onMouseDown={handleChartMouseDown}
+                    onMouseMove={handleChartMouseMove}
+                    onMouseUp={handleChartMouseUp}
+                  >
                     <defs>
                       <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="oklch(0.74 0.18 235)" stopOpacity={0.4} />
@@ -311,9 +504,9 @@ function StockDetail() {
                       orientation="left"
                     />
                     <Tooltip
-                      cursor={{ stroke: "oklch(0.74 0.18 235)", strokeWidth: 1, strokeDasharray: "3 3" }}
+                      cursor={activeTool === "none" ? { stroke: "oklch(0.74 0.18 235)", strokeWidth: 1, strokeDasharray: "3 3" } : false}
                       content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
+                        if (active && payload && payload.length && activeTool === "none") {
                           const d = payload[0].payload;
                           return (
                             <div className="rounded-lg glass p-3 hairline text-[11px] shadow-2xl min-w-[140px]">
@@ -338,6 +531,8 @@ function StockDetail() {
                         return null;
                       }}
                     />
+
+                    {renderDrawings()}
                     
                     {chartType === "Line" && (
                       <Line type="monotone" dataKey="c" stroke="oklch(0.74 0.18 235)" strokeWidth={2} dot={false} />
@@ -351,7 +546,7 @@ function StockDetail() {
                       <Bar 
                         dataKey="bodyRange" 
                         isAnimationActive={false}
-                        barSize={activePeriod.label === "1D" ? 4 : activePeriod.label === "5D" ? 3 : 2}
+                        barSize={activePeriod.label === "1D" ? 6 : activePeriod.label === "5D" ? 4 : 2}
                         shape={(props: any) => {
                           const { x, y, width, height, payload, yAxis } = props;
                           const isUp = payload.c >= payload.o;
@@ -380,7 +575,16 @@ function StockDetail() {
                           return (
                             <g key={`candle-${props.index}`}>
                               <line x1={centerX} y1={highY} x2={centerX} y2={lowY} stroke={color} strokeWidth={1} />
-                              <rect x={x} y={bodyTop} width={width} height={bodyHeight} fill={color} stroke={color} strokeWidth={0.5} />
+                              {/* Body: Filled Green and Red */}
+                              <rect 
+                                x={x + 1} 
+                                y={bodyTop} 
+                                width={width - 2} 
+                                height={bodyHeight} 
+                                fill={color} 
+                                stroke={color}
+                                strokeWidth={1}
+                              />
                             </g>
                           );
                         }}

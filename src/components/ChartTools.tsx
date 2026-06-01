@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Pencil, TrendingUp, Minus, Circle, Square, Type, Trash2 } from "lucide-react";
+import { Pencil, TrendingUp, Minus, Circle, Square, Type, Trash2, MousePointer2, MoveRight, Scissors, GripVertical } from "lucide-react";
 
-export type DrawingTool = "none" | "trendline" | "horizontal" | "fibonacci" | "rectangle" | "text";
+export type DrawingTool = "none" | "vertical" | "trendline" | "horizontal" | "rectangle" | "circle";
 
 export interface Drawing {
   id: string;
   type: DrawingTool;
-  points: { x: number; y: number }[];
+  points: { t: number; p: number }[]; // Time and Price
   color: string;
   text?: string;
 }
@@ -23,39 +23,43 @@ export function ChartDrawingTools({
   setDrawings: (drawings: Drawing[]) => void;
 }) {
   const tools = [
+    { id: "none" as DrawingTool, icon: MousePointer2, label: "Cursor" },
+    { id: "vertical" as DrawingTool, icon: GripVertical, label: "Vertical Line" },
     { id: "trendline" as DrawingTool, icon: TrendingUp, label: "Trend Line" },
     { id: "horizontal" as DrawingTool, icon: Minus, label: "Horizontal Line" },
-    { id: "fibonacci" as DrawingTool, icon: Circle, label: "Fibonacci" },
     { id: "rectangle" as DrawingTool, icon: Square, label: "Rectangle" },
-    { id: "text" as DrawingTool, icon: Type, label: "Text" },
+    { id: "circle" as DrawingTool, icon: Circle, label: "Circle" },
   ];
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="text-xs text-muted-foreground mr-2">Drawing Tools:</div>
+    <div className="flex items-center gap-1 bg-surface-1/50 p-1 rounded-xl hairline">
       {tools.map((tool) => (
         <button
           key={tool.id}
-          onClick={() => setActiveTool(activeTool === tool.id ? "none" : tool.id)}
-          className={`p-2 rounded-lg transition ${
+          onClick={() => setActiveTool(tool.id)}
+          className={`p-1.5 rounded-lg transition ${
             activeTool === tool.id 
-              ? "bg-primary/20 text-primary" 
+              ? "bg-primary text-white shadow-lg" 
               : "hover:bg-surface-2 text-muted-foreground"
           }`}
           title={tool.label}
         >
-          <tool.icon className="h-4 w-4" />
+          <tool.icon className="h-3.5 w-3.5" />
         </button>
       ))}
-      {drawings.length > 0 && (
-        <button
-          onClick={() => setDrawings([])}
-          className="p-2 rounded-lg hover:bg-surface-2 text-muted-foreground ml-2"
-          title="Clear All"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
-      )}
+      <div className="w-px h-4 bg-surface-3 mx-1" />
+      <button
+        onClick={() => setDrawings([])}
+        disabled={drawings.length === 0}
+        className={`p-1.5 rounded-lg transition ${
+          drawings.length === 0 
+            ? "opacity-30 cursor-not-allowed" 
+            : "hover:bg-bear/20 hover:text-bear text-muted-foreground"
+        }`}
+        title="Clear All"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

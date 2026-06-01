@@ -106,14 +106,14 @@ function Dashboard() {
   const { data: quotes = [] } = useQuery({
     queryKey: ["ibkr-quotes"],
     queryFn: () => getMarketSnapshot(ALL_CONIDS),
-    refetchInterval: 3_000,
-    staleTime: 2_000,
+    refetchInterval: 1_000,
+    staleTime: 500,
   });
 
   const { data: chartData = [], isFetching: chartLoading } = useQuery({
     queryKey: ["ibkr-chart-AAPL", activePeriod.period, activePeriod.bar],
     queryFn: () => getChartData(265598, activePeriod.period, activePeriod.bar),
-    refetchInterval: activePeriod.label === "1D" ? 30_000 : 300_000,
+    refetchInterval: activePeriod.label === "1D" ? 10_000 : 60_000,
   });
 
   const totalPnl = positions.reduce((a, p) => a + (p.pnl ?? 0), 0);
@@ -242,6 +242,8 @@ function Dashboard() {
                     />
                     <Tooltip
                       contentStyle={{ background: "oklch(0.20 0.015 260)", border: "1px solid oklch(1 0 0 / 10%)", borderRadius: 8, fontSize: 11 }}
+                      labelStyle={{ color: "oklch(0.9 0 0)", fontWeight: "600", marginBottom: "4px" }}
+                      itemStyle={{ color: "oklch(0.8 0 0)", padding: "2px 0" }}
                       formatter={(v: any, name: string) => {
                         const label = name === "o" ? "Open" : name === "h" ? "High" : name === "l" ? "Low" : name === "c" ? "Close" : name;
                         return [`$${fmtMoney(Number(v))}`, label];
@@ -376,6 +378,8 @@ function Dashboard() {
                 <YAxis tick={{ fontSize: 10, fill: "oklch(0.66 0.018 255)" }} axisLine={false} tickLine={false} tickFormatter={(v) => fmtCompact(v)} />
                 <Tooltip
                   contentStyle={{ background: "oklch(0.20 0.015 260)", border: "1px solid oklch(1 0 0 / 10%)", borderRadius: 8, fontSize: 12 }}
+                  labelStyle={{ color: "oklch(0.9 0 0)", fontWeight: "600", marginBottom: "4px" }}
+                  itemStyle={{ color: "oklch(0.8 0 0)", padding: "2px 0" }}
                   formatter={(v: any) => [fmtCompact(Number(v)), "Volume"]}
                   cursor={{ fill: "oklch(1 0 0 / 0.05)" }}
                 />

@@ -214,11 +214,20 @@ export const CONIDS: Record<string, number> = {
   VIX: 13455763,    // CBOE Volatility Index
 };
 
+const SUBSCRIBED_CONIDS = new Set<number>();
+
 export async function getMarketSnapshot(conids: number[]) {
-  // First call subscribes to stream
-  await ibkr<any[]>(`/iserver/marketdata/snapshot?conids=${conids.join(",")}&fields=31,83,84,85,86,87,88`).catch(() => {});
-  await new Promise((r) => setTimeout(r, 800));
-  // Second call returns populated data
+  const newConids = conids.filter(id => !SUBSCRIBED_CONIDS.has(id));
+  
+  if (newConids.length > 0) {
+    // First call subscribes to stream for new conids
+    await ibkr<any[]>(`/iserver/marketdata/snapshot?conids=${newConids.join(",")}&fields=31,83,84,85,86,87,88`).catch(() => {});
+    newConids.forEach(id => SUBSCRIBED_CONIDS.add(id));
+    // Small delay only when subscribing for the first time
+    await new Promise((r) => setTimeout(r, 600));
+  }
+
+  // Fetch populated data for all conids
   const data = await ibkr<any[]>(`/iserver/marketdata/snapshot?conids=${conids.join(",")}&fields=31,83,84,85,86,87,88`);
   return (data ?? []).map((d) => ({
     conid: d.conid,

@@ -13,8 +13,8 @@ export function Ticker() {
   const { data: quotes = [] } = useQuery({
     queryKey: ["ticker-quotes"],
     queryFn: () => getMarketSnapshot(TICKER_SYMBOLS.map(s => s.conid)),
-    refetchInterval: 3_000,
-    staleTime: 2_000,
+    refetchInterval: 1_000,
+    staleTime: 500,
   });
 
   // Enrich ticker data with real quotes

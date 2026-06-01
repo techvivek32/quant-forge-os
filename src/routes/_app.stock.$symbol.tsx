@@ -12,12 +12,11 @@ export const Route = createFileRoute("/_app/stock/$symbol")({
 });
 
 const PERIODS = [
-  { label: "1D", days: 1, period: "1d", bar: "5min" },
-  { label: "5D", days: 5, period: "1w", bar: "1h" },
-  { label: "1M", days: 30, period: "1m", bar: "1d" },
-  { label: "3M", days: 90, period: "3m", bar: "1d" },
-  { label: "6M", days: 180, period: "6m", bar: "1d" },
-  { label: "1Y", days: 365, period: "1y", bar: "1w" },
+  { label: "1D", days: 1, period: "1d", bar: "1min" },
+  { label: "5D", days: 5, period: "1w", bar: "5min" },
+  { label: "1M", days: 30, period: "1m", bar: "1h" },
+  { label: "6M", days: 180, period: "6m", bar: "4h" },
+  { label: "1Y", days: 365, period: "1y", bar: "1d" },
 ];
 
 const CHART_TYPES = ["Line", "Candlestick", "Area"] as const;
@@ -48,7 +47,10 @@ function StockDetail() {
     setLoading(true);
     fetchQuote();
     fetchChartData();
-    const interval = setInterval(fetchQuote, 1000);
+    const interval = setInterval(() => {
+      fetchQuote();
+      fetchChartData();
+    }, 1000);
     return () => clearInterval(interval);
   }, [symbol, activePeriod]);
 
@@ -63,19 +65,11 @@ function StockDetail() {
       if (data && data.length > 0) {
         const q = data[0];
         
-        // Calculate high/low from chart data if available
-        let high = q.last * 1.02;
-        let low = q.last * 0.98;
-        if (chartData.length > 0) {
-          high = Math.max(...chartData.map(d => d.h));
-          low = Math.min(...chartData.map(d => d.l));
-        }
-        
         setQuote({
           last: q.last,
           open: q.open || q.last,
-          high,
-          low,
+          high: q.high || q.last,
+          low: q.low || q.last,
           prevClose: q.last / (1 + q.changePct / 100),
           volume: q.volume,
           bid: q.bid,
@@ -99,7 +93,13 @@ function StockDetail() {
       console.log(`Fetching chart data for ${symbol} (${conid}): period=${activePeriod.period}, bar=${activePeriod.bar}`);
       const data = await getChartData(conid, activePeriod.period, activePeriod.bar);
       console.log(`Received ${data.length} bars:`, data.slice(0, 3));
-      const enhanced = enhanceDataWithIndicators(data);
+      const enhanced = enhanceDataWithIndicators(data).map((d: any) => ({
+        ...d,
+        // Range for the candlestick body
+        bodyRange: [d.o, d.c],
+        // Range for the candlestick wick
+        wickRange: [d.l, d.h],
+      }));
       setChartData(enhanced);
       
       // Calculate Y domain for candlestick alignment
@@ -194,20 +194,20 @@ function StockDetail() {
   }
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-4 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate({ to: "/" })} className="p-2 rounded-lg hover:bg-surface-2 transition">
-            <ArrowLeft className="h-5 w-5" />
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate({ to: "/" })} className="p-1.5 rounded-lg hover:bg-surface-2 transition">
+            <ArrowLeft className="h-4 w-4" />
           </button>
           <div>
-            <h1 className="text-xl font-bold">{symbol}</h1>
+            <h1 className="text-lg font-bold">{symbol}</h1>
             {quote && (
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-2xl font-bold num">${quote.last?.toFixed(2)}</span>
-                <span className={`flex items-center gap-1 text-base font-semibold ${isPositive ? "text-bull" : "text-bear"}`}>
-                  {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xl font-bold num">${quote.last?.toFixed(2)}</span>
+                <span className={`flex items-center gap-1 text-sm font-semibold ${isPositive ? "text-bull" : "text-bear"}`}>
+                  {isPositive ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
                   {isPositive ? "+" : ""}{changePct.toFixed(2)}%
                 </span>
               </div>
@@ -215,27 +215,27 @@ function StockDetail() {
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={createAlert} className="px-4 h-10 rounded-lg bg-surface-2 hover:bg-surface-3 transition flex items-center gap-2 text-sm font-medium">
-            <Bell className="h-4 w-4" /> Alert
+          <button onClick={createAlert} className="px-3 h-8 rounded-lg bg-surface-2 hover:bg-surface-3 transition flex items-center gap-2 text-xs font-medium">
+            <Bell className="h-3.5 w-3.5" /> Alert
           </button>
-          <button onClick={addToWatchlist} className="px-4 h-10 rounded-lg bg-surface-2 hover:bg-surface-3 transition flex items-center gap-2 text-sm font-medium">
-            <BookmarkPlus className="h-4 w-4" /> Watchlist
+          <button onClick={addToWatchlist} className="px-3 h-8 rounded-lg bg-surface-2 hover:bg-surface-3 transition flex items-center gap-2 text-xs font-medium">
+            <BookmarkPlus className="h-3.5 w-3.5" /> Watchlist
           </button>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4">
+      <div className="grid lg:grid-cols-[1fr_320px] gap-3">
         {/* Chart Section */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="rounded-2xl glass p-5">
+        <div className="space-y-3">
+          <div className="rounded-2xl glass p-4">
             {/* Chart Controls */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex gap-1">
                 {PERIODS.map((p) => (
                   <button
                     key={p.label}
                     onClick={() => setActivePeriod(p)}
-                    className={`px-3 h-8 rounded-md text-xs font-medium transition ${activePeriod.label === p.label ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:bg-surface-2"}`}
+                    className={`px-2.5 h-7 rounded-md text-[10px] font-medium transition ${activePeriod.label === p.label ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:bg-surface-2"}`}
                   >
                     {p.label}
                   </button>
@@ -246,7 +246,7 @@ function StockDetail() {
                   <button
                     key={type}
                     onClick={() => setChartType(type)}
-                    className={`px-3 h-8 rounded-md text-xs font-medium transition ${chartType === type ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:bg-surface-2"}`}
+                    className={`px-2.5 h-7 rounded-md text-[10px] font-medium transition ${chartType === type ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:bg-surface-2"}`}
                   >
                     {type}
                   </button>
@@ -255,12 +255,12 @@ function StockDetail() {
             </div>
 
             {/* Indicators */}
-            <div className="flex gap-2 mb-4 flex-wrap">
+            <div className="flex gap-1.5 mb-3 flex-wrap">
               {INDICATORS.map((ind) => (
                 <button
                   key={ind}
                   onClick={() => setIndicators(prev => prev.includes(ind) ? prev.filter(i => i !== ind) : [...prev, ind])}
-                  className={`px-3 h-7 rounded-md text-xs font-medium transition ${indicators.includes(ind) ? "bg-violet-500/20 text-violet-300" : "text-muted-foreground hover:bg-surface-2"}`}
+                  className={`px-2.5 h-6 rounded-md text-[10px] font-medium transition ${indicators.includes(ind) ? "bg-violet-500/20 text-violet-300" : "text-muted-foreground hover:bg-surface-2"}`}
                 >
                   {ind}
                 </button>
@@ -268,7 +268,7 @@ function StockDetail() {
             </div>
 
             {/* Drawing Tools */}
-            <div className="mb-4">
+            <div className="mb-3">
               <ChartDrawingTools 
                 activeTool={activeTool} 
                 setActiveTool={setActiveTool}
@@ -278,14 +278,14 @@ function StockDetail() {
             </div>
 
             {/* Main Chart */}
-            <div className="h-[300px] relative" ref={setChartContainerRef}>
+            <div className="h-[260px] relative" ref={setChartContainerRef}>
               {chartData.length === 0 ? (
                 <div className="h-full flex items-center justify-center">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
               ) : (
                 <ResponsiveContainer>
-                  <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
                     <defs>
                       <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="oklch(0.74 0.18 235)" stopOpacity={0.4} />
@@ -295,36 +295,47 @@ function StockDetail() {
                     <XAxis 
                       dataKey="t" 
                       tickFormatter={xFormatter} 
-                      tick={{ fontSize: 10, fill: "oklch(0.66 0.018 255)" }} 
-                      axisLine={false} 
-                      tickLine={false}
+                      tick={{ fontSize: 9, fill: "oklch(0.66 0.018 255)" }} 
+                      axisLine={{ stroke: "oklch(1 0 0 / 10%)" }} 
+                      tickLine={{ stroke: "oklch(1 0 0 / 10%)" }}
                       interval="preserveStartEnd"
+                      minTickGap={30}
                     />
                     <YAxis 
-                      domain={yDomain[0] !== 0 ? yDomain : ["dataMin - 1", "dataMax + 1"]} 
-                      tick={{ fontSize: 10, fill: "oklch(0.66 0.018 255)" }} 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tickFormatter={(v) => `$${v.toFixed(0)}`} 
-                      width={60} 
+                      domain={yDomain[0] !== 0 ? yDomain : ["dataMin", "dataMax"]} 
+                      tick={{ fontSize: 9, fill: "oklch(0.66 0.018 255)" }} 
+                      axisLine={{ stroke: "oklch(1 0 0 / 10%)" }} 
+                      tickLine={{ stroke: "oklch(1 0 0 / 10%)" }} 
+                      tickFormatter={(v) => `$${v.toFixed(2)}`} 
+                      width={65}
+                      orientation="left"
                     />
                     <Tooltip
-                      contentStyle={{ background: "oklch(0.20 0.015 260)", border: "1px solid oklch(1 0 0 / 10%)", borderRadius: 8, fontSize: 11 }}
-                      formatter={(v: any, name: string) => {
-                        if (name === "o") return [`$${Number(v).toFixed(2)}`, "Open"];
-                        if (name === "h") return [`$${Number(v).toFixed(2)}`, "High"];
-                        if (name === "l") return [`$${Number(v).toFixed(2)}`, "Low"];
-                        if (name === "c") return [`$${Number(v).toFixed(2)}`, "Close"];
-                        return [`$${Number(v).toFixed(2)}`];
-                      }}
-                      labelFormatter={(t) => {
-                        const d = new Date(t);
-                        return d.toLocaleString("en-US", { 
-                          month: "short", 
-                          day: "numeric", 
-                          hour: "2-digit", 
-                          minute: "2-digit" 
-                        });
+                      cursor={{ stroke: "oklch(0.74 0.18 235)", strokeWidth: 1, strokeDasharray: "3 3" }}
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const d = payload[0].payload;
+                          return (
+                            <div className="rounded-lg glass p-3 hairline text-[11px] shadow-2xl min-w-[140px]">
+                              <div className="font-bold text-[oklch(0.9_0_0)] mb-2">
+                                {new Date(d.t).toLocaleString("en-US", { 
+                                  month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" 
+                                })}
+                              </div>
+                              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                <span className="text-muted-foreground">Open</span>
+                                <span className="text-foreground font-mono text-right">${d.o.toFixed(2)}</span>
+                                <span className="text-muted-foreground">High</span>
+                                <span className="text-bull font-mono text-right">${d.h.toFixed(2)}</span>
+                                <span className="text-muted-foreground">Low</span>
+                                <span className="text-bear font-mono text-right">${d.l.toFixed(2)}</span>
+                                <span className="text-muted-foreground">Close</span>
+                                <span className="text-foreground font-mono text-right font-bold">${d.c.toFixed(2)}</span>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
                       }}
                     />
                     
@@ -337,10 +348,45 @@ function StockDetail() {
                     )}
                     
                     {chartType === "Candlestick" && (
-                      <>
-                        <Line type="monotone" dataKey="h" stroke="transparent" dot={false} connectNulls />
-                        <Line type="monotone" dataKey="l" stroke="transparent" dot={false} connectNulls />
-                      </>
+                      <Bar 
+                        dataKey="bodyRange" 
+                        isAnimationActive={false}
+                        barSize={activePeriod.label === "1D" ? 4 : activePeriod.label === "5D" ? 3 : 2}
+                        shape={(props: any) => {
+                          const { x, y, width, height, payload, yAxis } = props;
+                          const isUp = payload.c >= payload.o;
+                          const color = isUp ? "oklch(0.70 0.20 150)" : "oklch(0.60 0.22 25)";
+                          
+                          let highY, lowY, openY, closeY;
+                          if (yAxis && yAxis.scale) {
+                            highY = yAxis.scale(payload.h);
+                            lowY = yAxis.scale(payload.l);
+                            openY = yAxis.scale(payload.o);
+                            closeY = yAxis.scale(payload.c);
+                          } else {
+                            const range = Math.max(yDomain[1] - yDomain[0], 0.001);
+                            const scalePrice = (p: number) => y + height - ((p - yDomain[0]) / range) * height;
+                            highY = scalePrice(payload.h);
+                            lowY = scalePrice(payload.l);
+                            openY = scalePrice(payload.o);
+                            closeY = scalePrice(payload.c);
+                          }
+                          
+                          const bodyTop = Math.min(openY, closeY);
+                          const bodyBottom = Math.max(openY, closeY);
+                          const bodyHeight = Math.max(Math.abs(openY - closeY), 1);
+                          const centerX = x + width / 2;
+
+                          return (
+                            <g key={`candle-${props.index}`}>
+                              <line x1={centerX} y1={highY} x2={centerX} y2={lowY} stroke={color} strokeWidth={1} />
+                              <rect x={x} y={bodyTop} width={width} height={bodyHeight} fill={color} stroke={color} strokeWidth={0.5} />
+                            </g>
+                          );
+                        }}
+                      >
+                        {chartData.map((_, index) => <Cell key={`body-${index}`} />)}
+                      </Bar>
                     )}
                     
                     {indicators.includes("BB") && (
@@ -355,25 +401,6 @@ function StockDetail() {
                 </ResponsiveContainer>
               )}
             </div>
-
-            {/* Candlestick Overlay */}
-            {chartType === "Candlestick" && chartData.length > 0 && chartContainerRef && (
-              <div style={{ 
-                position: "absolute", 
-                top: 155, 
-                left: 80, 
-                right: 8, 
-                height: 300,
-                pointerEvents: "none"
-              }}>
-                <CandlestickChart 
-                  data={chartData}
-                  width={chartContainerRef.offsetWidth - 68}
-                  height={280}
-                  yDomain={yDomain}
-                />
-              </div>
-            )}
 
             {/* Volume Chart */}
             {indicators.includes("Volume") && (
@@ -407,20 +434,20 @@ function StockDetail() {
           </div>
 
           {/* Technical Analysis */}
-          <div className="rounded-2xl glass p-5">
-            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <Activity className="h-4 w-4" /> Technical Analysis
+          <div className="rounded-2xl glass p-4">
+            <h3 className="text-xs font-semibold mb-2 flex items-center gap-2">
+              <Activity className="h-3.5 w-3.5" /> Technical Analysis
             </h3>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               {[
                 { label: "RSI (14)", value: chartData[chartData.length - 1]?.rsi?.toFixed(1) || "—", signal: (chartData[chartData.length - 1]?.rsi || 50) > 70 ? "Overbought" : (chartData[chartData.length - 1]?.rsi || 50) < 30 ? "Oversold" : "Neutral" },
                 { label: "SMA (20)", value: `$${chartData[chartData.length - 1]?.sma20?.toFixed(2) || "—"}`, signal: quote?.last > (chartData[chartData.length - 1]?.sma20 || 0) ? "Bullish" : "Bearish" },
                 { label: "EMA (12)", value: `$${chartData[chartData.length - 1]?.ema12?.toFixed(2) || "—"}`, signal: quote?.last > (chartData[chartData.length - 1]?.ema12 || 0) ? "Bullish" : "Bearish" },
               ].map((item) => (
-                <div key={item.label} className="rounded-lg hairline bg-surface-1 p-3">
-                  <div className="text-xs text-muted-foreground">{item.label}</div>
-                  <div className="font-semibold num mt-1">{item.value}</div>
-                  <div className={`text-xs mt-1 ${item.signal.includes("Bull") || item.signal === "Oversold" ? "text-bull" : item.signal.includes("Bear") || item.signal === "Overbought" ? "text-bear" : "text-muted-foreground"}`}>
+                <div key={item.label} className="rounded-lg hairline bg-surface-1 p-2">
+                  <div className="text-[10px] text-muted-foreground">{item.label}</div>
+                  <div className="font-semibold num text-xs mt-0.5">{item.value}</div>
+                  <div className={`text-[10px] mt-0.5 ${item.signal.includes("Bull") || item.signal === "Oversold" ? "text-bull" : item.signal.includes("Bear") || item.signal === "Overbought" ? "text-bear" : "text-muted-foreground"}`}>
                     {item.signal}
                   </div>
                 </div>
@@ -428,16 +455,18 @@ function StockDetail() {
             </div>
             
             {/* Advanced Indicators */}
-            <AdvancedIndicators data={chartData} indicators={indicators} />
+            <div className="mt-3">
+              <AdvancedIndicators data={chartData} indicators={indicators} />
+            </div>
           </div>
         </div>
 
         {/* Trading Panel */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           {/* Quote Stats */}
-          <div className="rounded-2xl glass p-5">
-            <h3 className="text-sm font-semibold mb-3">Market Data</h3>
-            <div className="space-y-2 text-sm">
+          <div className="rounded-2xl glass p-4">
+            <h3 className="text-xs font-semibold mb-2">Market Data</h3>
+            <div className="space-y-1.5 text-xs">
               {[
                 { label: "Open", value: `$${quote?.open?.toFixed(2) || "—"}` },
                 { label: "High", value: `$${quote?.high?.toFixed(2) || "—"}`, color: "text-bull" },
@@ -456,34 +485,34 @@ function StockDetail() {
           </div>
 
           {/* Order Entry */}
-          <div className="rounded-2xl glass p-5">
-            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <Zap className="h-4 w-4" /> Place Order
+          <div className="rounded-2xl glass p-4">
+            <h3 className="text-xs font-semibold mb-2 flex items-center gap-2">
+              <Zap className="h-3.5 w-3.5" /> Place Order
             </h3>
             
             {/* Buy/Sell Toggle */}
-            <div className="grid grid-cols-2 gap-2 mb-3">
+            <div className="grid grid-cols-2 gap-2 mb-2">
               <button
                 onClick={() => setOrderSide("buy")}
-                className={`h-10 rounded-lg font-semibold transition ${orderSide === "buy" ? "bg-bull text-white" : "bg-surface-2 text-muted-foreground"}`}
+                className={`h-8 rounded-lg text-xs font-semibold transition ${orderSide === "buy" ? "bg-bull text-white" : "bg-surface-2 text-muted-foreground"}`}
               >
                 BUY
               </button>
               <button
                 onClick={() => setOrderSide("sell")}
-                className={`h-10 rounded-lg font-semibold transition ${orderSide === "sell" ? "bg-bear text-white" : "bg-surface-2 text-muted-foreground"}`}
+                className={`h-8 rounded-lg text-xs font-semibold transition ${orderSide === "sell" ? "bg-bear text-white" : "bg-surface-2 text-muted-foreground"}`}
               >
                 SELL
               </button>
             </div>
 
             {/* Order Type */}
-            <div className="mb-3">
-              <label className="text-xs text-muted-foreground mb-1 block">Order Type</label>
+            <div className="mb-2">
+              <label className="text-[10px] text-muted-foreground mb-1 block uppercase tracking-wider">Order Type</label>
               <select
                 value={orderType}
                 onChange={(e) => setOrderType(e.target.value as any)}
-                className="w-full h-10 rounded-lg bg-surface-2 px-3 text-sm"
+                className="w-full h-8 rounded-lg bg-surface-2 px-2 text-xs"
               >
                 <option value="market">Market</option>
                 <option value="limit">Limit</option>
@@ -492,27 +521,27 @@ function StockDetail() {
             </div>
 
             {/* Quantity */}
-            <div className="mb-3">
-              <label className="text-xs text-muted-foreground mb-1 block">Quantity</label>
+            <div className="mb-2">
+              <label className="text-[10px] text-muted-foreground mb-1 block uppercase tracking-wider">Quantity</label>
               <input
                 type="number"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
-                className="w-full h-10 rounded-lg bg-surface-2 px-3 text-sm"
+                className="w-full h-8 rounded-lg bg-surface-2 px-2 text-xs"
                 placeholder="100"
               />
             </div>
 
             {/* Limit Price */}
             {orderType === "limit" && (
-              <div className="mb-3">
-                <label className="text-xs text-muted-foreground mb-1 block">Limit Price</label>
+              <div className="mb-2">
+                <label className="text-[10px] text-muted-foreground mb-1 block uppercase tracking-wider">Limit Price</label>
                 <input
                   type="number"
                   step="0.01"
                   value={limitPrice}
                   onChange={(e) => setLimitPrice(e.target.value)}
-                  className="w-full h-10 rounded-lg bg-surface-2 px-3 text-sm"
+                  className="w-full h-8 rounded-lg bg-surface-2 px-2 text-xs"
                   placeholder="0.00"
                 />
               </div>
@@ -520,21 +549,21 @@ function StockDetail() {
 
             {/* Stop Price */}
             {orderType === "stop" && (
-              <div className="mb-3">
-                <label className="text-xs text-muted-foreground mb-1 block">Stop Price</label>
+              <div className="mb-2">
+                <label className="text-[10px] text-muted-foreground mb-1 block uppercase tracking-wider">Stop Price</label>
                 <input
                   type="number"
                   step="0.01"
                   value={stopPrice}
                   onChange={(e) => setStopPrice(e.target.value)}
-                  className="w-full h-10 rounded-lg bg-surface-2 px-3 text-sm"
+                  className="w-full h-8 rounded-lg bg-surface-2 px-2 text-xs"
                   placeholder="0.00"
                 />
               </div>
             )}
 
             {/* Order Summary */}
-            <div className="rounded-lg bg-surface-2 p-3 mb-3 text-xs space-y-1">
+            <div className="rounded-lg bg-surface-2 p-2 mb-2 text-[10px] space-y-1">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Est. Total</span>
                 <span className="font-semibold num">
@@ -546,12 +575,12 @@ function StockDetail() {
             {/* Place Order Button */}
             <button
               onClick={placeOrder}
-              className={`w-full h-11 rounded-lg font-semibold transition ${orderSide === "buy" ? "bg-bull hover:bg-bull/90" : "bg-bear hover:bg-bear/90"} text-white`}
+              className={`w-full h-9 rounded-lg text-xs font-semibold transition ${orderSide === "buy" ? "bg-bull hover:bg-bull/90" : "bg-bear hover:bg-bear/90"} text-white`}
             >
               {orderSide === "buy" ? "BUY" : "SELL"} {symbol}
             </button>
 
-            <div className="mt-3 text-xs text-muted-foreground flex items-start gap-2">
+            <div className="mt-2 text-[10px] text-muted-foreground flex items-start gap-1.5 leading-tight">
               <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
               <span>Trading involves risk. This is a simulated environment.</span>
             </div>

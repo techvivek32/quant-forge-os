@@ -217,7 +217,7 @@ function Dashboard() {
           ) : (
             <>
               {/* Price Chart */}
-              <div className="h-[200px]">
+              <div className="h-[280px]">
                 <ResponsiveContainer>
                   <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                     <defs>
@@ -270,7 +270,7 @@ function Dashboard() {
               </div>
 
               {/* Volume bars */}
-              <div className="h-[50px]">
+              <div className="h-[70px]">
                 <ResponsiveContainer>
                   <BarChart data={chartData} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
                     <YAxis hide />

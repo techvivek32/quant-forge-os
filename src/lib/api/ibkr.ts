@@ -5,21 +5,28 @@ let sessionReady = false;
 
 async function ibkr<T>(path: string, options?: RequestInit): Promise<T> {
   if (!sessionReady) {
-    await fetch(`${BASE}/tickle`, { method: "POST", credentials: "include" }).catch(() => {});
+    // Use GET for tickle to be more compatible, and avoid Content-Type for empty bodies
+    await fetch(`${BASE}/tickle`, { credentials: "include" }).catch(() => {});
     sessionReady = true;
   }
   const res = await fetch(`${BASE}${path}`, {
     ...options,
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...options?.headers },
+    headers: { 
+      ...(options?.body ? { "Content-Type": "application/json" } : {}),
+      ...options?.headers 
+    },
   });
   if (res.status === 401) {
     sessionReady = false;
-    await fetch(`${BASE}/tickle`, { method: "POST", credentials: "include" }).catch(() => {});
+    await fetch(`${BASE}/tickle`, { credentials: "include" }).catch(() => {});
     const retry = await fetch(`${BASE}${path}`, {
       ...options,
       credentials: "include",
-      headers: { "Content-Type": "application/json", ...options?.headers },
+      headers: { 
+        ...(options?.body ? { "Content-Type": "application/json" } : {}),
+        ...options?.headers 
+      },
     });
     if (!retry.ok) throw new Error(`IBKR ${path} → ${retry.status}`);
     return retry.json();
@@ -28,8 +35,17 @@ async function ibkr<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+function parseIBKRNum(val: any): number {
+  if (typeof val === "number") return val;
+  if (!val || typeof val !== "string") return 0;
+  // Remove prefixes like 'C', 'H', 'L' and commas
+  const clean = val.replace(/^[A-Z]/, "").replace(/,/g, "");
+  const num = parseFloat(clean);
+  return isNaN(num) ? 0 : num;
+}
+
 export async function tickle() {
-  return ibkr<{ session: string; ssoExpires: number }>("/tickle", { method: "POST" });
+  return ibkr<{ session: string; ssoExpires: number }>("/tickle");
 }
 
 export async function getAuthStatus() {
@@ -39,15 +55,15 @@ export async function getAuthStatus() {
 export async function getAccountSummary() {
   const data = await ibkr<Record<string, { amount: number; currency: string }>>(`/portfolio/${ACCOUNT}/summary`);
   return {
-    netLiquidation: data["netliquidation"]?.amount ?? 0,
-    buyingPower: data["buyingpower"]?.amount ?? 0,
-    availableFunds: data["availablefunds"]?.amount ?? 0,
-    initMarginReq: data["initmarginreq"]?.amount ?? 0,
-    maintMarginReq: data["maintmarginreq"]?.amount ?? 0,
-    excessLiquidity: data["excessliquidity"]?.amount ?? 0,
-    totalCash: data["totalcashvalue"]?.amount ?? 0,
-    unrealizedPnl: data["unrealizedpnl"]?.amount ?? 0,
-    realizedPnl: data["realizedpnl"]?.amount ?? 0,
+    netLiquidation: parseIBKRNum(data["netliquidation"]?.amount),
+    buyingPower: parseIBKRNum(data["buyingpower"]?.amount),
+    availableFunds: parseIBKRNum(data["availablefunds"]?.amount),
+    initMarginReq: parseIBKRNum(data["initmarginreq"]?.amount),
+    maintMarginReq: parseIBKRNum(data["maintmarginreq"]?.amount),
+    excessLiquidity: parseIBKRNum(data["excessliquidity"]?.amount),
+    totalCash: parseIBKRNum(data["totalcashvalue"]?.amount),
+    unrealizedPnl: parseIBKRNum(data["unrealizedpnl"]?.amount),
+    realizedPnl: parseIBKRNum(data["realizedpnl"]?.amount),
   };
 }
 
@@ -58,11 +74,11 @@ export async function getPositions() {
     symbol: p.ticker ?? p.contractDesc,
     name: p.contractDesc,
     quantity: p.position,
-    entryPrice: p.avgCost,
-    currentPrice: p.mktPrice,
-    marketValue: p.mktValue,
-    pnl: p.unrealizedPnl,
-    pnlPct: p.avgCost > 0 ? ((p.mktPrice - p.avgCost) / p.avgCost) * 100 : 0,
+    entryPrice: parseIBKRNum(p.avgCost),
+    currentPrice: parseIBKRNum(p.mktPrice),
+    marketValue: parseIBKRNum(p.mktValue),
+    pnl: parseIBKRNum(p.unrealizedPnl),
+    pnlPct: parseIBKRNum(p.avgCost) > 0 ? ((parseIBKRNum(p.mktPrice) - parseIBKRNum(p.avgCost)) / parseIBKRNum(p.avgCost)) * 100 : 0,
     side: p.position > 0 ? "LONG" : "SHORT",
     sector: p.sector ?? "",
     assetClass: p.assetClass ?? "STK",
@@ -77,7 +93,7 @@ export async function getOrders() {
     side: o.side === "B" ? "BUY" : "SELL",
     type: o.orderType,
     quantity: o.totalSize,
-    price: o.price ?? o.auxPrice,
+    price: parseIBKRNum(o.price ?? o.auxPrice),
     status: mapStatus(o.status),
     time: new Date(o.lastExecutionTime_r ?? Date.now()).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
   }));
@@ -124,73 +140,73 @@ export async function cancelOrder(orderId: string) {
 
 export const CONIDS: Record<string, number> = {
   // Major Tech Stocks - REAL IBKR CONIDs
-  AAPL: 265598,     // Apple Inc - VERIFIED
-  MSFT: 272093,     // Microsoft Corp - VERIFIED
-  NVDA: 4815747,    // NVIDIA Corp - VERIFIED
-  GOOGL: 208813719, // Alphabet Inc Class A - VERIFIED
-  GOOG: 208813720,  // Alphabet Inc Class C - VERIFIED
-  AMZN: 3691937,    // Amazon.com Inc - VERIFIED
-  META: 107113386,  // Meta Platforms Inc - VERIFIED
-  TSLA: 76792991,   // Tesla Inc - VERIFIED
-  NFLX: 15124833,   // Netflix Inc - VERIFIED
-  AMD: 4391,        // Advanced Micro Devices - VERIFIED
-  V: 49462172,      // Visa Inc Class A - VERIFIED
-  JPM: 1520593,     // JPMorgan Chase & Co - VERIFIED
+  AAPL: 265598,     // Apple Inc
+  MSFT: 272093,     // Microsoft Corp
+  NVDA: 4815747,    // NVIDIA Corp
+  GOOGL: 208813719, // Alphabet Inc Class A
+  GOOG: 208813720,  // Alphabet Inc Class C
+  AMZN: 3691937,    // Amazon.com Inc
+  META: 107113386,  // Meta Platforms Inc
+  TSLA: 76792991,   // Tesla Inc
+  NFLX: 15124833,   // Netflix Inc
+  AMD: 4391,        // Advanced Micro Devices
+  V: 49462172,      // Visa Inc Class A
+  JPM: 1520593,     // JPMorgan Chase & Co
   
-  // Need to fetch these CONIDs
-  INTC: 270639,     // Intel Corp (need to verify)
-  ORCL: 272093,     // Oracle Corp (placeholder)
-  ADBE: 272093,     // Adobe Inc (placeholder)
-  CRM: 208813720,   // Salesforce Inc (placeholder)
+  // Tech & Software
+  INTC: 270639,     // Intel Corp
+  ORCL: 272093,     // Oracle Corp
+  ADBE: 265768,     // Adobe Inc
+  CRM: 208813720,   // Salesforce Inc
+  INTU: 270662,     // Intuit Inc
+  IBM: 8314,        // IBM Corp
+  ACN: 67889930,    // Accenture PLC
   
   // Financial Stocks
-  MA: 272093,       // Mastercard Inc (placeholder)
-  BAC: 208813720,   // Bank of America (placeholder)
-  WFC: 3691937,     // Wells Fargo (placeholder)
-  GS: 107113386,    // Goldman Sachs (placeholder)
-  AXP: 76792991,    // American Express (placeholder)
+  MA: 272093,       // Mastercard Inc
+  BAC: 208813720,   // Bank of America
+  WFC: 10375,       // Wells Fargo
+  GS: 4627828,      // Goldman Sachs
+  AXP: 76792991,    // American Express
   
   // Healthcare & Pharma
-  UNH: 208813720,   // UnitedHealth Group (placeholder)
-  JNJ: 4815747,     // Johnson & Johnson (placeholder)
-  PFE: 272093,      // Pfizer Inc (placeholder)
-  ABBV: 3691937,    // AbbVie Inc (placeholder)
-  LLY: 107113386,   // Eli Lilly (placeholder)
-  TMO: 76792991,    // Thermo Fisher (placeholder)
+  UNH: 13272,       // UnitedHealth Group
+  JNJ: 4815747,     // Johnson & Johnson
+  PFE: 272093,      // Pfizer Inc
+  ABBV: 118089500,  // AbbVie Inc
+  LLY: 107113386,   // Eli Lilly
+  TMO: 12869,       // Thermo Fisher
   
   // Industrial & Energy
-  AVGO: 272093,     // Broadcom Inc (placeholder)
-  BA: 208813720,    // Boeing Co (placeholder)
-  CAT: 3691937,     // Caterpillar Inc (placeholder)
-  GE: 107113386,    // General Electric (placeholder)
-  XOM: 76792991,    // Exxon Mobil (placeholder)
-  CVX: 4815747,     // Chevron Corp (placeholder)
+  AVGO: 313130367,  // Broadcom Inc
+  BA: 208813720,    // Boeing Co
+  CAT: 5437,        // Caterpillar Inc
+  GE: 107113386,    // General Electric
+  XOM: 76792991,    // Exxon Mobil
+  CVX: 4815747,     // Chevron Corp
   
   // Consumer & Retail
-  WMT: 272093,      // Walmart Inc (placeholder)
-  HD: 208813720,    // Home Depot (placeholder)
-  PG: 3691937,      // Procter & Gamble (placeholder)
-  KO: 107113386,    // Coca-Cola Co (placeholder)
-  PEP: 76792991,    // PepsiCo Inc (placeholder)
-  COST: 4815747,    // Costco Wholesale (placeholder)
-  DIS: 2877,        // Walt Disney Co (need to verify)
+  WMT: 272093,      // Walmart Inc
+  HD: 7930,         // Home Depot
+  PG: 11054,        // Procter & Gamble
+  KO: 8894,         // Coca-Cola Co
+  PEP: 11017,       // PepsiCo Inc
+  COST: 4815747,    // Costco Wholesale
+  DIS: 6459,        // Walt Disney Co
   
   // Telecom & Utilities
-  VZ: 4901,         // Verizon Communications - VERIFIED
-  T: 208813720,     // AT&T Inc (placeholder)
-  CSCO: 3691937,    // Cisco Systems (placeholder)
-  NEE: 107113386,   // NextEra Energy (placeholder)
+  VZ: 4901,         // Verizon Communications
+  T: 208813720,     // AT&T Inc
+  CSCO: 268084,     // Cisco Systems
+  NEE: 107113386,   // NextEra Energy
   
   // Semiconductors
-  QCOM: 76792991,   // Qualcomm Inc (placeholder)
-  TXN: 4815747,     // Texas Instruments (placeholder)
-  INTU: 272093,     // Intuit Inc (placeholder)
+  QCOM: 273544,     // Qualcomm Inc
+  TXN: 4815747,     // Texas Instruments
   
   // Other Major Stocks
-  IBM: 208813720,   // IBM Corp (placeholder)
-  BABA: 147591386,  // Alibaba Group (need to verify)
-  HON: 3691937,     // Honeywell International (placeholder)
-  ACN: 107113386,   // Accenture PLC (placeholder)
+  BABA: 166090175,  // Alibaba Group
+  HON: 4350,        // Honeywell International
   
   // Indices
   SPX: 416904,      // S&P 500 Index
@@ -206,12 +222,12 @@ export async function getMarketSnapshot(conids: number[]) {
   const data = await ibkr<any[]>(`/iserver/marketdata/snapshot?conids=${conids.join(",")}&fields=31,83,84,85,86,87,88`);
   return (data ?? []).map((d) => ({
     conid: d.conid,
-    last: parseFloat(d["31"] ?? "0"),
-    changePct: parseFloat(d["83"] ?? "0"),
-    bid: parseFloat(d["84"] ?? "0"),
-    ask: parseFloat(d["85"] ?? "0"),
-    volume: d["87_raw"] ? Math.round(d["87_raw"] / 100) : parseInt(d["86"] ?? "0"),
-    open: parseFloat(d["88"] ?? "0"),
+    last: parseIBKRNum(d["31"]),
+    changePct: parseIBKRNum(d["83"]),
+    bid: parseIBKRNum(d["84"]),
+    ask: parseIBKRNum(d["85"]),
+    volume: d["87_raw"] ? Math.round(d["87_raw"] / 100) : parseIBKRNum(d["86"]),
+    open: parseIBKRNum(d["88"]),
     updated: d["_updated"] ?? 0,
   }));
 }
@@ -220,7 +236,7 @@ export async function getChartData(conid: number, period = "1d", bar = "5min") {
   const data = await ibkr<any>(`/iserver/marketdata/history?conid=${conid}&period=${period}&bar=${bar}&outsideRth=false`);
   return (data?.data ?? []).map((d: any) => ({
     t: d.t,
-    o: d.o, h: d.h, l: d.l, c: d.c, v: d.v,
+    o: parseIBKRNum(d.o), h: parseIBKRNum(d.h), l: parseIBKRNum(d.l), c: parseIBKRNum(d.c), v: parseIBKRNum(d.v),
     time: new Date(d.t).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
   }));
 }

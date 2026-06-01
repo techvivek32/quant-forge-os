@@ -111,6 +111,8 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+import { tickle } from "@/lib/api/ibkr";
+
 function AuthListener() {
   const router = useRouter();
   const qc = useQueryClient();
@@ -121,7 +123,7 @@ function AuthListener() {
     });
     // Keep IBKR session alive every 60s
     const ibkrPing = setInterval(() => {
-      fetch("/ibkr/tickle", { method: "POST" }).catch(() => {});
+      tickle().catch(() => {});
     }, 60_000);
     return () => { subscription.unsubscribe(); clearInterval(ibkrPing); };
   }, [router, qc]);

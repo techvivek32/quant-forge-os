@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Delta, LiveDot } from "@/components/Delta";
 import { fmtCompact, fmtMoney, SECTORS } from "@/lib/market-data";
-import { getAccountSummary, getPositions, getMarketSnapshot, getChartData } from "@/lib/api/ibkr";
+import { getAccountSummary, getPositions, getMarketSnapshot, getChartData, CONIDS } from "@/lib/api/ibkr";
 import { Activity, Brain, Flame, Gauge, Loader2, Sparkles, TrendingDown, TrendingUp, Zap } from "lucide-react";
 import {
   Area, AreaChart, Bar, BarChart, Cell, ComposedChart,
@@ -20,13 +20,61 @@ export const Route = createFileRoute("/_app/")({
   component: Dashboard,
 });
 
-const SYMBOLS = [
-  { symbol: "AAPL", name: "Apple Inc.", conid: 265598, sector: "Technology" },
-  { symbol: "MSFT", name: "Microsoft Corp.", conid: 272093, sector: "Technology" },
-  { symbol: "NVDA", name: "NVIDIA Corp.", conid: 4815747, sector: "Semiconductors" },
-  { symbol: "TSLA", name: "Tesla Inc.", conid: 76792991, sector: "Consumer Disc." },
-  { symbol: "JPM", name: "JPMorgan Chase", conid: 1520593, sector: "Financials" },
-];
+const SYMBOL_METADATA: Record<string, { name: string; sector: string }> = {
+  AAPL: { name: "Apple Inc.", sector: "Technology" },
+  MSFT: { name: "Microsoft Corp.", sector: "Technology" },
+  NVDA: { name: "NVIDIA Corp.", sector: "Semiconductors" },
+  GOOGL: { name: "Alphabet Inc.", sector: "Communication" },
+  AMZN: { name: "Amazon.com Inc.", sector: "Consumer Disc." },
+  META: { name: "Meta Platforms", sector: "Communication" },
+  TSLA: { name: "Tesla Inc.", sector: "Consumer Disc." },
+  JPM: { name: "JPMorgan Chase", sector: "Financials" },
+  V: { name: "Visa Inc.", sector: "Financials" },
+  NFLX: { name: "Netflix Inc.", sector: "Communication" },
+  AMD: { name: "Advanced Micro Devices", sector: "Semiconductors" },
+  INTC: { name: "Intel Corp.", sector: "Semiconductors" },
+  BABA: { name: "Alibaba Group", sector: "Consumer Disc." },
+  DIS: { name: "Walt Disney Co.", sector: "Communication" },
+  BA: { name: "Boeing Co.", sector: "Industrials" },
+  GE: { name: "General Electric", sector: "Industrials" },
+  WMT: { name: "Walmart Inc.", sector: "Consumer Staples" },
+  PG: { name: "Procter & Gamble", sector: "Consumer Staples" },
+  JNJ: { name: "Johnson & Johnson", sector: "Healthcare" },
+  HD: { name: "Home Depot", sector: "Consumer Disc." },
+  CVX: { name: "Chevron Corp.", sector: "Energy" },
+  LLY: { name: "Eli Lilly", sector: "Healthcare" },
+  XOM: { name: "Exxon Mobil", sector: "Energy" },
+  ABBV: { name: "AbbVie Inc.", sector: "Healthcare" },
+  PFE: { name: "Pfizer Inc.", sector: "Healthcare" },
+  KO: { name: "Coca-Cola Co.", sector: "Consumer Staples" },
+  COST: { name: "Costco Wholesale", sector: "Consumer Staples" },
+  ADBE: { name: "Adobe Inc.", sector: "Technology" },
+  CRM: { name: "Salesforce Inc.", sector: "Technology" },
+  ORCL: { name: "Oracle Corp.", sector: "Technology" },
+  ACN: { name: "Accenture PLC", sector: "Technology" },
+  TMO: { name: "Thermo Fisher", sector: "Healthcare" },
+  VZ: { name: "Verizon", sector: "Communication" },
+  CSCO: { name: "Cisco Systems", sector: "Technology" },
+  PEP: { name: "PepsiCo Inc.", sector: "Consumer Staples" },
+  QCOM: { name: "Qualcomm Inc.", sector: "Semiconductors" },
+  TXN: { name: "Texas Instruments", sector: "Semiconductors" },
+  INTU: { name: "Intuit Inc.", sector: "Technology" },
+  IBM: { name: "IBM Corp.", sector: "Technology" },
+  CAT: { name: "Caterpillar Inc.", sector: "Industrials" },
+  GS: { name: "Goldman Sachs", sector: "Financials" },
+  AXP: { name: "American Express", sector: "Financials" },
+  HON: { name: "Honeywell", sector: "Industrials" },
+  NEE: { name: "NextEra Energy", sector: "Utilities" },
+};
+
+const SYMBOLS = Object.entries(CONIDS)
+  .filter(([symbol]) => !["SPX", "NDX", "VIX"].includes(symbol))
+  .map(([symbol, conid]) => ({
+    symbol,
+    conid,
+    name: SYMBOL_METADATA[symbol]?.name ?? symbol,
+    sector: SYMBOL_METADATA[symbol]?.sector ?? "Other",
+  }));
 
 const PERIODS = [
   { label: "1D", period: "1d", bar: "5min" },
@@ -82,11 +130,24 @@ function Dashboard() {
     ? new Date(Math.max(...enriched.map(e => e.updated))).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : null;
 
-  const gainers = [...enriched].sort((a, b) => b.changePct - a.changePct).slice(0, 4);
-  const losers = [...enriched].sort((a, b) => a.changePct - b.changePct).slice(0, 4);
-  const byVolume = [...enriched].sort((a, b) => b.volume - a.volume).slice(0, 4);
+  const gainers = [...enriched].sort((a, b) => b.changePct - a.changePct).slice(0, 6);
+  const losers = [...enriched].sort((a, b) => a.changePct - b.changePct).slice(0, 6);
+  const byVolume = [...enriched].sort((a, b) => b.volume - a.volume).slice(0, 6);
 
   const aaplQuote = enriched.find(s => s.symbol === "AAPL");
+
+  // Calculate real sector performance
+  const sectorPerformance = Object.entries(
+    enriched.reduce((acc, s) => {
+      if (!acc[s.sector]) acc[s.sector] = { sum: 0, count: 0 };
+      acc[s.sector].sum += s.changePct;
+      acc[s.sector].count += 1;
+      return acc;
+    }, {} as Record<string, { sum: number; count: number }>)
+  ).map(([name, { sum, count }]) => ({
+    name,
+    changePct: sum / count,
+  })).sort((a, b) => b.changePct - a.changePct);
 
   // Chart date range label
   const chartDateLabel = chartData.length > 0
@@ -277,10 +338,10 @@ function Dashboard() {
               <Brain className="h-4 w-4 text-violet" /> Live Quotes
               {lastUpdated && <span className="text-[10px] text-muted-foreground ml-auto">{lastUpdated}</span>}
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
               {enriched.length === 0 ? (
                 <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-primary" /></div>
-              ) : enriched.map((s) => (
+              ) : enriched.slice(0, 15).map((s) => (
                 <div 
                   key={s.symbol} 
                   onClick={() => navigate({ to: `/stock/${s.symbol}` })}
@@ -304,7 +365,7 @@ function Dashboard() {
           </div>
           <div className="h-[160px]">
             <ResponsiveContainer>
-              <BarChart data={enriched} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <BarChart data={byVolume} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <XAxis 
                   dataKey="symbol" 
                   tick={{ fontSize: 11, fill: "oklch(0.66 0.018 255)", cursor: "pointer" }} 
@@ -354,7 +415,7 @@ function Dashboard() {
           </div>
         </div>
         <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
-          {SECTORS.map((s) => {
+          {sectorPerformance.map((s) => {
             const up = s.changePct >= 0;
             const intensity = Math.min(1, Math.abs(s.changePct) / 2.5);
             const bg = up

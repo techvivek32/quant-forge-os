@@ -28,6 +28,9 @@ async function fetchConid(symbol) {
       hostname: 'localhost',
       port: 5000,
       path: `/v1/api/iserver/secdef/search?symbol=${symbol}&name=false&secType=STK`,
+      headers: {
+        'User-Agent': 'Mozilla/5.0'
+      },
       method: 'GET',
       rejectUnauthorized: false
     };

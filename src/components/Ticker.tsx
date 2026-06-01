@@ -1,25 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { getMarketSnapshot } from "@/lib/api/ibkr";
+import { getMarketSnapshot, CONIDS } from "@/lib/api/ibkr";
 import { fmtMoney } from "@/lib/market-data";
 
-const TICKER_SYMBOLS = [
-  { symbol: "AAPL", conid: 265598 },
-  { symbol: "MSFT", conid: 272093 },
-  { symbol: "NVDA", conid: 4815747 },
-  { symbol: "GOOGL", conid: 208813719 },
-  { symbol: "AMZN", conid: 3691937 },
-  { symbol: "META", conid: 107113386 },
-  { symbol: "TSLA", conid: 76792991 },
-  { symbol: "JPM", conid: 1520593 },
-  { symbol: "V", conid: 49462172 },
-  { symbol: "NFLX", conid: 15124833 },
-  { symbol: "AMD", conid: 4391 },
-  { symbol: "INTC", conid: 270639 },
-  { symbol: "DIS", conid: 2877 },
-  { symbol: "VZ", conid: 4901 },
-  { symbol: "BABA", conid: 147591386 },
-];
+const TICKER_SYMBOLS = Object.entries(CONIDS)
+  .filter(([symbol]) => !["SPX", "NDX", "VIX"].includes(symbol))
+  .map(([symbol, conid]) => ({ symbol, conid }));
 
 export function Ticker() {
   const navigate = useNavigate();

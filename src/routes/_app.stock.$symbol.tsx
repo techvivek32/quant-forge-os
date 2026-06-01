@@ -41,6 +41,9 @@ function StockDetail() {
   const [loading, setLoading] = useState(true);
   const [chartContainerRef, setChartContainerRef] = useState<HTMLDivElement | null>(null);
   const [yDomain, setYDomain] = useState<[number, number]>([0, 0]);
+  const [viewWindow, setViewWindow] = useState({ start: 0, end: 100 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [lastPanX, setLastPanX] = useState(0);
 
   useEffect(() => {
     if (!symbol) return;
@@ -49,10 +52,107 @@ function StockDetail() {
     fetchChartData();
     const interval = setInterval(() => {
       fetchQuote();
-      fetchChartData();
+      // Only auto-refresh chart if we are at the "present" (end of data)
+      if (viewWindow.end >= chartData.length - 5) {
+        fetchChartData();
+      }
     }, 1000);
     return () => clearInterval(interval);
   }, [symbol, activePeriod]);
+
+  useEffect(() => {
+    if (chartData.length > 0 && viewWindow.end === 0) {
+      // Initial view: show last 100 points
+      const count = activePeriod.label === "1D" ? 78 : 100;
+      setViewWindow({
+        start: Math.max(0, chartData.length - count),
+        end: chartData.length
+      });
+    }
+  }, [chartData]);
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (!chartData.length) return;
+    e.preventDefault();
+    
+    const zoomFactor = 0.15;
+    const direction = e.deltaY > 0 ? 1 : -1; // positive = zoom out, negative = zoom in
+    const currentCount = viewWindow.end - viewWindow.start;
+    const change = Math.round(currentCount * zoomFactor * direction);
+    
+    // Zoom from both sides to keep center relatively stable
+    const halfChange = Math.floor(change / 2);
+    let newStart = Math.max(0, viewWindow.start + halfChange);
+    let newEnd = Math.min(chartData.length, viewWindow.end - halfChange);
+    
+    // Ensure minimum 10 candles
+    if (newEnd - newStart < 10) {
+      if (newStart === 0) newEnd = 10;
+      else newStart = newEnd - 10;
+    }
+
+    setViewWindow({ start: newStart, end: newEnd });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (activeTool !== "none") return;
+    setIsPanning(true);
+    setLastPanX(e.clientX);
+    // Prevent interaction with drawing tools while panning
+    e.stopPropagation();
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isPanning || !chartData.length) return;
+    
+    const deltaX = e.clientX - lastPanX;
+    if (Math.abs(deltaX) < 2) return; 
+
+    const pointsPerPixel = (viewWindow.end - viewWindow.start) / (chartContainerRef?.offsetWidth || 800);
+    const shift = Math.round(-deltaX * pointsPerPixel);
+    
+    if (shift === 0) return;
+
+    let newStart = viewWindow.start + shift;
+    let newEnd = viewWindow.end + shift;
+
+    // Bounds checking
+    if (newStart < 0) {
+      newEnd -= newStart;
+      newStart = 0;
+    }
+    if (newEnd > chartData.length) {
+      newStart -= (newEnd - chartData.length);
+      newEnd = chartData.length;
+    }
+    
+    // Final sanity check
+    newStart = Math.max(0, newStart);
+    newEnd = Math.min(newEnd, chartData.length);
+
+    if (newStart !== viewWindow.start || newEnd !== viewWindow.end) {
+      setViewWindow({ start: newStart, end: newEnd });
+      setLastPanX(e.clientX);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsPanning(false);
+  };
+
+  const visibleData = chartData.slice(viewWindow.start, viewWindow.end);
+
+  useEffect(() => {
+    if (visibleData.length > 0) {
+      const prices = visibleData.flatMap(d => [d.h, d.l]);
+      const min = Math.min(...prices);
+      const max = Math.max(...prices);
+      const range = max - min;
+      // Add 10% padding to top and bottom
+      const padding = range * 0.1 || min * 0.01; 
+      setYDomain([min - padding, max + padding]);
+    }
+  }, [visibleData]);
 
   const fetchQuote = async () => {
     try {
@@ -91,7 +191,9 @@ function StockDetail() {
         return;
       }
       console.log(`Fetching chart data for ${symbol} (${conid}): period=${activePeriod.period}, bar=${activePeriod.bar}`);
-      const data = await getChartData(conid, activePeriod.period, activePeriod.bar);
+      // Request larger period to allow panning back
+      const requestPeriod = activePeriod.label === "1D" ? "1w" : activePeriod.period;
+      const data = await getChartData(conid, requestPeriod, activePeriod.bar);
       console.log(`Received ${data.length} bars:`, data.slice(0, 3));
       const enhanced = enhanceDataWithIndicators(data).map((d: any) => ({
         ...d,
@@ -239,6 +341,30 @@ function StockDetail() {
             strokeWidth={2}
             strokeDasharray="3 3"
           />
+        );
+      }
+      if (drawing.type === "fib") {
+        const diff = p1.p - p2.p;
+        const levels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+        return (
+          <g key={drawing.id}>
+            {levels.map((lvl) => (
+              <ReferenceLine
+                key={`${drawing.id}-${lvl}`}
+                y={p1.p - diff * lvl}
+                stroke={drawing.color}
+                strokeWidth={1}
+                strokeDasharray="3 3"
+                label={{
+                  value: `${(lvl * 100).toFixed(1)}% ($${(p1.p - diff * lvl).toFixed(2)})`,
+                  position: "insideLeft",
+                  fill: drawing.color,
+                  fontSize: 9,
+                  fontWeight: "bold",
+                }}
+              />
+            ))}
+          </g>
         );
       }
       if (drawing.type === "trendline") {
@@ -465,7 +591,15 @@ function StockDetail() {
             </div>
 
             {/* Main Chart */}
-            <div className="h-[260px] relative" ref={setChartContainerRef}>
+            <div 
+              className="h-[400px] relative cursor-crosshair select-none" 
+              ref={setChartContainerRef}
+              onWheel={handleWheel}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            >
               {chartData.length === 0 ? (
                 <div className="h-full flex items-center justify-center">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -473,7 +607,7 @@ function StockDetail() {
               ) : (
                 <ResponsiveContainer>
                   <ComposedChart 
-                    data={chartData} 
+                    data={visibleData} 
                     margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
                     onMouseDown={handleChartMouseDown}
                     onMouseMove={handleChartMouseMove}

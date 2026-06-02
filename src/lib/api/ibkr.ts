@@ -1,5 +1,9 @@
 const BASE = "/ibkr";
-const ACCOUNT = import.meta.env.VITE_IBKR_ACCOUNT_ID ?? "U25901412";
+let CURRENT_ACCOUNT = import.meta.env.VITE_IBKR_ACCOUNT_ID ?? "U25901412";
+
+export function setIBKRAccount(id: string) {
+  CURRENT_ACCOUNT = id;
+}
 
 let sessionReady = false;
 
@@ -53,7 +57,7 @@ export async function getAuthStatus() {
 }
 
 export async function getAccountSummary() {
-  const data = await ibkr<Record<string, { amount: number; currency: string }>>(`/portfolio/${ACCOUNT}/summary`);
+  const data = await ibkr<Record<string, { amount: number; currency: string }>>(`/portfolio/${CURRENT_ACCOUNT}/summary`);
   return {
     netLiquidation: parseIBKRNum(data["netliquidation"]?.amount),
     buyingPower: parseIBKRNum(data["buyingpower"]?.amount),
@@ -68,7 +72,7 @@ export async function getAccountSummary() {
 }
 
 export async function getPositions() {
-  const data = await ibkr<any[]>(`/portfolio/${ACCOUNT}/positions/0`);
+  const data = await ibkr<any[]>(`/portfolio/${CURRENT_ACCOUNT}/positions/0`);
   return (data ?? []).map((p) => ({
     conid: p.conid,
     symbol: p.ticker ?? p.contractDesc,
@@ -128,14 +132,14 @@ export async function placeOrder(symbol: string, side: "BUY" | "SELL", qty: numb
     );
   }
 
-  return ibkr<any[]>(`/iserver/account/${ACCOUNT}/orders`, {
+  return ibkr<any[]>(`/iserver/account/${CURRENT_ACCOUNT}/orders`, {
     method: "POST",
     body: JSON.stringify({ orders }),
   });
 }
 
 export async function cancelOrder(orderId: string) {
-  return ibkr<any>(`/iserver/account/${ACCOUNT}/order/${orderId}`, { method: "DELETE" });
+  return ibkr<any>(`/iserver/account/${CURRENT_ACCOUNT}/order/${orderId}`, { method: "DELETE" });
 }
 
 export const CONIDS: Record<string, number> = {

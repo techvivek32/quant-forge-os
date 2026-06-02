@@ -2,8 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { LiveDot } from "@/components/Delta";
 import { Check, Plug, RefreshCw, Shield, Zap, Loader2, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getAccountSummary, getAuthStatus, placeOrder, tickle } from "@/lib/api/ibkr";
+import { useTrading } from "@/lib/trading-context";
 import { fmtMoney } from "@/lib/market-data";
 import { toast } from "sonner";
 
@@ -14,7 +15,7 @@ export const Route = createFileRoute("/_app/broker")({
 
 function Broker() {
   const qc = useQueryClient();
-  const [paper, setPaper] = useState(false);
+  const { isPaper, setIsPaper, currentAccount } = useTrading();
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [type, setType] = useState("LMT");
   const [symbol, setSymbol] = useState("AAPL");
@@ -60,7 +61,7 @@ function Broker() {
             </div>
             <div>
               <div className="text-sm font-semibold">Interactive Brokers</div>
-              <div className="text-[11px] text-muted-foreground">U25901412 · {paper ? "Paper" : "Live"} · Client Portal</div>
+              <div className="text-[11px] text-muted-foreground">{currentAccount} · {isPaper ? "Paper" : "Live"} · Client Portal</div>
             </div>
             <div className={`ml-auto flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-medium ${connected ? "bg-bull/15 text-bull" : "bg-bear/15 text-bear"}`}>
               <LiveDot /> {connected ? "Connected" : "Disconnected"}
@@ -76,11 +77,11 @@ function Broker() {
 
           <div className="mt-5 flex items-center justify-between rounded-xl hairline bg-surface-1 p-3">
             <div>
-              <div className="text-sm font-medium">{paper ? "Paper Trading" : "Live Trading"}</div>
-              <div className="text-[11px] text-muted-foreground">{paper ? "Risk-free simulation" : "Real money — orders execute on IBKR"}</div>
+              <div className="text-sm font-medium">{isPaper ? "Paper Trading" : "Live Trading"}</div>
+              <div className="text-[11px] text-muted-foreground">{isPaper ? "Risk-free simulation" : "Real money — orders execute on IBKR"}</div>
             </div>
-            <button onClick={() => setPaper((p) => !p)} className={`relative h-6 w-11 rounded-full transition ${paper ? "bg-warn" : "bg-bull glow-bull"}`}>
-              <span className="absolute top-0.5 h-5 w-5 rounded-full bg-background transition" style={{ left: paper ? 2 : 22 }} />
+            <button onClick={() => { setIsPaper(!isPaper); qc.invalidateQueries(); }} className={`relative h-6 w-11 rounded-full transition ${isPaper ? "bg-warn" : "bg-bull glow-bull"}`}>
+              <span className="absolute top-0.5 h-5 w-5 rounded-full bg-background transition" style={{ left: isPaper ? 2 : 22 }} />
             </button>
           </div>
 
@@ -124,7 +125,7 @@ function Broker() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="text-sm font-semibold flex items-center gap-2"><Zap className="h-4 w-4 text-info" /> Order Ticket</div>
-            <div className="text-[11px] text-muted-foreground">{paper ? "Paper" : "Live"} · Smart Routing</div>
+            <div className="text-[11px] text-muted-foreground">{isPaper ? "Paper" : "Live"} · Smart Routing</div>
           </div>
         </div>
 

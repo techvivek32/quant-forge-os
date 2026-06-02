@@ -1,9 +1,10 @@
-import { Bell, Command, Search, Sparkles, Plug2, LogOut } from "lucide-react";
+import { Bell, Command, Search, Sparkles, Plug2, LogOut, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { LiveDot } from "./Delta";
 import { SymbolSearch } from "./SymbolSearch";
 import { useAuth } from "@/lib/auth-context";
+import { useTrading } from "@/lib/trading-context";
 import { getAuthStatus } from "@/lib/api/ibkr";
 import {
   DropdownMenu,
@@ -17,6 +18,7 @@ import {
 export function Topbar() {
   const [now, setNow] = useState(() => new Date());
   const { user, signOut } = useAuth();
+  const { isPaper } = useTrading();
   
   const { data: authStatus } = useQuery({
     queryKey: ["ibkr-auth"],
@@ -57,6 +59,12 @@ export function Topbar() {
       <SymbolSearch />
 
       <div className="flex items-center gap-2">
+        {isPaper && (
+          <div className="flex items-center gap-1.5 rounded-full bg-warn/15 text-warn px-2.5 py-1 text-[11px] font-bold border border-warn/20 glow-warn animate-pulse">
+            <ShieldCheck className="h-3 w-3" />
+            PAPER
+          </div>
+        )}
         <button className={`hidden md:inline-flex items-center gap-2 rounded-lg hairline px-3 h-9 text-xs transition ${
           authStatus?.connected 
             ? 'bg-[oklch(0.78_0.18_152/0.12)] text-bull hover:bg-[oklch(0.78_0.18_152/0.18)]'

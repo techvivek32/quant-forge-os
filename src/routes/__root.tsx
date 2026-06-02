@@ -11,6 +11,7 @@ import { useEffect } from "react";
 
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/lib/auth-context";
+import { TradingProvider } from "@/lib/trading-context";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -136,9 +137,11 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <AuthListener />
-        <Outlet />
-        <Toaster richColors theme="dark" position="top-right" />
+        <TradingProvider>
+          <AuthListener />
+          <Outlet />
+          <Toaster richColors theme="dark" position="top-right" />
+        </TradingProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

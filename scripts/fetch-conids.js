@@ -14,7 +14,7 @@ const SYMBOLS = [
 
 async function fetchCONID(symbol) {
   return new Promise((resolve, reject) => {
-    const url = `https://localhost:5000/v1/api/iserver/secdef/search?symbol=${symbol}&name=false&secType=STK`;
+    const url = `https://backend.nassphx.com/v1/api/iserver/secdef/search?symbol=${symbol}&name=false&secType=STK`;
     
     https.get(url, (res) => {
       let data = '';

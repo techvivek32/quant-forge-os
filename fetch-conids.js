@@ -25,8 +25,8 @@ const symbols = [
 async function fetchConid(symbol) {
   return new Promise((resolve, reject) => {
     const options = {
-      hostname: 'localhost',
-      port: 5000,
+      hostname: 'backend.nassphx.com',
+      port: 443,
       path: `/v1/api/iserver/secdef/search?symbol=${symbol}&name=false&secType=STK`,
       headers: {
         'User-Agent': 'Mozilla/5.0'

@@ -14,11 +14,11 @@ export default defineConfig({
     server: {
       proxy: {
         "/ibkr": {
-          target: "https://localhost:5000",
+          target: "https://backend.nassphx.com",
           changeOrigin: true,
-          secure: false,
-          cookieDomainRewrite: "localhost",
-          headers: { "origin": "https://localhost:5000" },
+          secure: true,
+          cookieDomainRewrite: "backend.nassphx.com",
+          headers: { "origin": "https://backend.nassphx.com" },
           rewrite: (path) => path.replace(/^\/ibkr/, "/v1/api"),
         },
       },

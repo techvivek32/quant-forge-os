@@ -1,4 +1,4 @@
-const BASE = "/ibkr";
+const BASE = import.meta.env.PROD ? "https://backend.nassphx.com/v1/api" : "/ibkr";
 let CURRENT_ACCOUNT = import.meta.env.VITE_IBKR_ACCOUNT_ID ?? "U25901412";
 
 export function setIBKRAccount(id: string) {
@@ -9,33 +9,59 @@ let sessionReady = false;
 
 async function ibkr<T>(path: string, options?: RequestInit): Promise<T> {
   if (!sessionReady) {
-    // Use GET for tickle to be more compatible, and avoid Content-Type for empty bodies
-    await fetch(`${BASE}/tickle`, { credentials: "include" }).catch(() => {});
-    sessionReady = true;
+    try {
+      await fetch(`${BASE}/tickle`, { 
+        credentials: "include",
+        mode: 'cors'
+      }).catch(() => {});
+      sessionReady = true;
+    } catch (error) {
+      console.warn('Tickle failed:', error);
+    }
   }
+  
   const res = await fetch(`${BASE}${path}`, {
     ...options,
     credentials: "include",
+    mode: 'cors',
     headers: { 
       ...(options?.body ? { "Content-Type": "application/json" } : {}),
       ...options?.headers 
     },
   });
+  
   if (res.status === 401) {
     sessionReady = false;
-    await fetch(`${BASE}/tickle`, { credentials: "include" }).catch(() => {});
-    const retry = await fetch(`${BASE}${path}`, {
-      ...options,
-      credentials: "include",
-      headers: { 
-        ...(options?.body ? { "Content-Type": "application/json" } : {}),
-        ...options?.headers 
-      },
-    });
-    if (!retry.ok) throw new Error(`IBKR ${path} → ${retry.status}`);
-    return retry.json();
+    // Try to re-authenticate
+    try {
+      await fetch(`${BASE}/tickle`, { 
+        credentials: "include",
+        mode: 'cors' 
+      }).catch(() => {});
+      
+      const retry = await fetch(`${BASE}${path}`, {
+        ...options,
+        credentials: "include",
+        mode: 'cors',
+        headers: { 
+          ...(options?.body ? { "Content-Type": "application/json" } : {}),
+          ...options?.headers 
+        },
+      });
+      
+      if (!retry.ok) throw new Error(`IBKR ${path} → ${retry.status}`);
+      return retry.json();
+    } catch (error) {
+      console.error('Re-authentication failed:', error);
+      throw error;
+    }
   }
-  if (!res.ok) throw new Error(`IBKR ${path} → ${res.status}`);
+  
+  if (!res.ok) {
+    console.error(`IBKR ${path} → ${res.status}`, await res.text());
+    throw new Error(`IBKR ${path} → ${res.status}`);
+  }
+  
   return res.json();
 }
 

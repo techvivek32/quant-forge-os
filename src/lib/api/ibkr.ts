@@ -49,7 +49,12 @@ export async function tickle() {
 }
 
 export async function getAuthStatus() {
-  return ibkr<{ authenticated: boolean; connected: boolean; competing: boolean }>("/iserver/auth/status");
+  const status = await ibkr<{ authenticated: boolean; connected: boolean; competing: boolean }>("/iserver/auth/status");
+  // If authenticated but iserver not yet connected, trigger reauthentication
+  if (status.authenticated && !status.connected) {
+    ibkr("/iserver/reauthenticate", { method: "POST" }).catch(() => {});
+  }
+  return status;
 }
 
 export async function getAccountSummary() {
@@ -217,18 +222,18 @@ export const CONIDS: Record<string, number> = {
 const SUBSCRIBED_CONIDS = new Set<number>();
 
 export async function getMarketSnapshot(conids: number[]) {
-  const newConids = conids.filter(id => !SUBSCRIBED_CONIDS.has(id));
-  
+  // Deduplicate — IBKR rejects requests with duplicate conids
+  const unique = [...new Set(conids)];
+  const newConids = unique.filter(id => !SUBSCRIBED_CONIDS.has(id));
+
   if (newConids.length > 0) {
-    // First call subscribes to stream for new conids
     await ibkr<any[]>(`/iserver/marketdata/snapshot?conids=${newConids.join(",")}&fields=31,83,84,85,86,87,88`).catch(() => {});
     newConids.forEach(id => SUBSCRIBED_CONIDS.add(id));
-    // Small delay only when subscribing for the first time
     await new Promise((r) => setTimeout(r, 600));
   }
 
-  // Fetch populated data for all conids
-  const data = await ibkr<any[]>(`/iserver/marketdata/snapshot?conids=${conids.join(",")}&fields=31,83,84,85,86,87,88`);
+  // Fetch populated data — use unique conids only
+  const data = await ibkr<any[]>(`/iserver/marketdata/snapshot?conids=${unique.join(",")}&fields=31,83,84,85,86,87,88`);
   return (data ?? []).map((d) => ({
     conid: d.conid,
     last: parseIBKRNum(d["31"]),
@@ -242,7 +247,8 @@ export async function getMarketSnapshot(conids: number[]) {
 }
 
 export async function getChartData(conid: number, period = "1d", bar = "5min") {
-  const data = await ibkr<any>(`/iserver/marketdata/history?conid=${conid}&period=${period}&bar=${bar}&outsideRth=false`);
+  const data = await ibkr<any>(`/iserver/marketdata/history?conid=${conid}&period=${period}&bar=${bar}&outsideRth=false`).catch(() => null);
+  if (!data) return [];
   return (data?.data ?? []).map((d: any) => ({
     t: d.t,
     o: parseIBKRNum(d.o), h: parseIBKRNum(d.h), l: parseIBKRNum(d.l), c: parseIBKRNum(d.c), v: parseIBKRNum(d.v),

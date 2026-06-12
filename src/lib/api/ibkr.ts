@@ -1,67 +1,37 @@
-const BASE = import.meta.env.PROD ? "https://backend.nassphx.com/v1/api" : "/ibkr";
+const BASE = import.meta.env.PROD ? "/api/ibkr" : "/ibkr";
 let CURRENT_ACCOUNT = import.meta.env.VITE_IBKR_ACCOUNT_ID ?? "U25901412";
 
 export function setIBKRAccount(id: string) {
   CURRENT_ACCOUNT = id;
 }
 
-let sessionReady = false;
+// Circuit breaker: after a 401, suppress all IBKR calls for 30s to prevent flooding
+let blockedUntil = 0;
 
 async function ibkr<T>(path: string, options?: RequestInit): Promise<T> {
-  if (!sessionReady) {
-    try {
-      await fetch(`${BASE}/tickle`, { 
-        credentials: "include",
-        mode: 'cors'
-      }).catch(() => {});
-      sessionReady = true;
-    } catch (error) {
-      console.warn('Tickle failed:', error);
-    }
+  if (Date.now() < blockedUntil) {
+    throw new Error("IBKR session not authenticated — retrying shortly");
   }
-  
+
   const res = await fetch(`${BASE}${path}`, {
     ...options,
     credentials: "include",
     mode: 'cors',
-    headers: { 
+    headers: {
       ...(options?.body ? { "Content-Type": "application/json" } : {}),
-      ...options?.headers 
+      ...options?.headers
     },
   });
-  
+
   if (res.status === 401) {
-    sessionReady = false;
-    // Try to re-authenticate
-    try {
-      await fetch(`${BASE}/tickle`, { 
-        credentials: "include",
-        mode: 'cors' 
-      }).catch(() => {});
-      
-      const retry = await fetch(`${BASE}${path}`, {
-        ...options,
-        credentials: "include",
-        mode: 'cors',
-        headers: { 
-          ...(options?.body ? { "Content-Type": "application/json" } : {}),
-          ...options?.headers 
-        },
-      });
-      
-      if (!retry.ok) throw new Error(`IBKR ${path} → ${retry.status}`);
-      return retry.json();
-    } catch (error) {
-      console.error('Re-authentication failed:', error);
-      throw error;
-    }
+    blockedUntil = Date.now() + 30_000;
+    throw new Error("IBKR session unauthorized — please authenticate the gateway");
   }
-  
+
   if (!res.ok) {
-    console.error(`IBKR ${path} → ${res.status}`, await res.text());
     throw new Error(`IBKR ${path} → ${res.status}`);
   }
-  
+
   return res.json();
 }
 

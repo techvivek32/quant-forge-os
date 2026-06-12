@@ -30,13 +30,18 @@ export function Topbar() {
     return () => clearInterval(t);
   }, []);
 
-  // Market status
-  const marketHours = now.getHours();
-  const isWeekday = now.getDay() >= 1 && now.getDay() <= 5;
-  const isMarketOpen = isWeekday && marketHours >= 9 && marketHours < 16;
+  // Market status — always in US Eastern Time
+  const etParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric", hour12: false, weekday: "short",
+  }).formatToParts(now);
+  const etHour = parseInt(etParts.find(p => p.type === "hour")!.value, 10);
+  const etDay = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(etParts.find(p => p.type === "weekday")!.value);
+  const isWeekday = etDay >= 1 && etDay <= 5;
+  const isMarketOpen = isWeekday && etHour >= 9 && etHour < 16;
 
-  const time = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
-  const date = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const time = now.toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  const date = now.toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric" });
 
   const email = user?.email ?? "";
   const initials = (email.split("@")[0] || "U").slice(0, 2).toUpperCase();

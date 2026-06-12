@@ -28,6 +28,11 @@ async function ibkr<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error("IBKR session unauthorized — please authenticate the gateway");
   }
 
+  // 400 on market data endpoints = market closed or iserver not ready — return null, don't throw
+  if (res.status === 400 && path.includes("/iserver/marketdata/")) {
+    return null as T;
+  }
+
   if (!res.ok) {
     throw new Error(`IBKR ${path} → ${res.status}`);
   }
@@ -233,7 +238,7 @@ export async function getMarketSnapshot(conids: number[]) {
   }
 
   // Fetch populated data — use unique conids only
-  const data = await ibkr<any[]>(`/iserver/marketdata/snapshot?conids=${unique.join(",")}&fields=31,83,84,85,86,87,88`);
+  const data = await ibkr<any[] | null>(`/iserver/marketdata/snapshot?conids=${unique.join(",")}&fields=31,83,84,85,86,87,88`);
   return (data ?? []).map((d) => ({
     conid: d.conid,
     last: parseIBKRNum(d["31"]),
